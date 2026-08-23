@@ -1,13 +1,13 @@
 {
-  "updated": "2026-08-23T14:37:32Z",
+  "updated": "2026-08-23T19:46:44Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 781,
-    "tagged": 156,
+    "posts": 786,
+    "tagged": 157,
     "matched": 103,
     "ambiguous": 0,
-    "unmatched": 53
+    "unmatched": 54
   },
   "movies": {
     "454639": {
@@ -174,7 +174,7 @@
           "title": "[負雷] 《玩命航線》你們趕快打好不好，快悶死了",
           "url": "https://www.ptt.cc/bbs/movie/M.1787140352.A.0F6.html",
           "date": "8/19",
-          "push": 30
+          "push": 31
         },
         {
           "tag": "好雷",
