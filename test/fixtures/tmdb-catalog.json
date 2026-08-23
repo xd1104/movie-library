@@ -1,0 +1,11 @@
+{
+  "_comment": "測試用假 TMDB 片單（電影院＋串流）。⚠️ 手寫測資，id 是真的 TMDB id 但資料未經查證。",
+  "movies": [
+    { "id": 693134, "title": "沙丘：第二部", "original_title": "Dune: Part Two" },
+    { "id": 438631, "title": "沙丘", "original_title": "Dune" },
+    { "id": 1022789, "title": "腦筋急轉彎2", "original_title": "Inside Out 2" },
+    { "id": 653346, "title": "猩球崛起：王國誕生", "original_title": "Kingdom of the Planet of the Apes" },
+    { "id": 573435, "title": "捍衛戰士：獨行俠", "original_title": "Top Gun: Maverick" },
+    { "id": 872585, "title": "奧本海默", "original_title": "Oppenheimer" }
+  ]
+}

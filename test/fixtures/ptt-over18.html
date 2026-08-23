@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<!-- 測試用假 PTT 年齡確認頁。⚠️ 手寫測資。 -->
+<html><head><title>批踢踢實業坊</title></head><body>
+<div id="main-container">
+<div class="bbs-screen bbs-content over18-notice">
+	<p>本網站已依台灣網站內容分級規定處理</p>
+	<p>警告︰您即將進入之看板內容需滿十八歲方可瀏覽。</p>
+	<p>若您尚未年滿十八歲，請點選離開。若您已滿十八歲，亦不可將本區之內容派發、傳閱、出售、出租、交給或借予年齡未滿18歲的人士瀏覽。</p>
+</div>
+<form action="/ask/over18" method="post">
+	<input type="hidden" name="from" value="/bbs/movie/index.html">
+	<div class="over18-button-container">
+		<button class="btn-big" type="submit" name="yes" value="yes">我同意，我已年滿十八歲進入</button>
+	</div>
+</form>
+</div>
+</body></html>

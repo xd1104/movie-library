@@ -53,7 +53,7 @@ npm test
 ```
   ✓ t1-firstrun     26 過 /  0 失敗    第一次使用／設定金鑰
   ...
-  全部通過：共 327 個斷言，327 過 / 0 失敗，10 支測試檔
+  全部通過：共 492 個斷言，492 過 / 0 失敗，11 支測試檔
 ```
 
 ```bash
@@ -114,3 +114,73 @@ scripts/gen-icons.mjs    一次性的 icon 產生器（純 Node、零依賴，�
 - [OMDb](https://www.omdbapi.com/)：IMDb、爛番茄、Metacritic 分數
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+## PTT 鄉民評價（每天自動抓）
+
+PTT 電影板的文章標題自帶 `[好雷]` / `[普雷]` / `[負雷]`，數標題就能算風向——
+**不用 AI、不讀內文**。GitHub Actions 每天抓一次，產出 `data/ptt-movie.json` 存回 repo，
+App 直接讀同源的這個檔（純靜態網頁不能自己抓 PTT，跨網域會被擋）。
+
+### 老闆要做的事：設一個 secret（只做一次）
+
+repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+| | |
+|---|---|
+| Name | `TMDB_KEY` |
+| Secret | 你的 TMDB **API Key (v3 auth)**，32 碼那組（跟 App 設定頁貼的是同一組） |
+
+爬蟲要用它抓「電影院上映中 ＋ 台灣訂閱串流」的片單，才知道要把 PTT 文章對到哪部片。
+**沒設的話 workflow 會直接紅掉並告訴你去哪裡設**，不會安靜產出一份空檔案。
+
+金鑰只存在 GitHub secret 裡：不進 repo、不進紀錄（程式所有輸出都會先把 `api_key=` 遮成 `***`）。
+
+### 怎麼跑
+
+- 自動：每天台灣時間 03:30（`.github/workflows/ptt.yml`）
+- 手動：Actions → 「抓 PTT 電影板評價」 → **Run workflow**
+- 本機（不連網、用假測資跑完整流程，看得到輸出長相）：
+
+```bash
+node scripts/fetch-ptt.mjs --offline --out=/tmp/ptt.json
+```
+
+### 檔案長相（`data/ptt-movie.json`）
+
+```json
+{
+  "updated": "2026-08-23T04:00:00Z",
+  "source": "https://www.ptt.cc/bbs/movie/index.html",
+  "scanned": { "pages": 20, "posts": 843, "matched": 412, "unmatched": 431 },
+  "movies": {
+    "693134": {
+      "good": 12, "ok": 3, "bad": 1,
+      "posts": [
+        { "tag": "好雷", "title": "[好雷] 沙丘2 視聽饗宴",
+          "url": "https://www.ptt.cc/bbs/movie/M.1234567890.A.ABC.html", "date": "8/20", "push": 45 }
+      ]
+    }
+  }
+}
+```
+
+- key 是 **TMDB 電影 id**；`good`/`ok`/`bad` ＝ 好雷/普雷/負雷（**全部文章的數量**）
+- `posts` 依推文數由高到低，**每部片最多 8 則**（檔案會被使用者下載，不能無限長）
+- **沒有討論的片不會出現在 `movies` 裡**（App 顯示「PTT 上沒找到討論」）
+- `scanned` 是健康度：`pages` 抓了幾頁、`posts` 掃到幾篇（含非雷文）、
+  `matched`/`unmatched` 是**雷文**裡比對到片／沒比對到的篇數（比對率＝ matched ÷ (matched+unmatched)）
+
+### 出事的時候看哪裡
+
+Actions 的紀錄最後有一段「這一輪的結果」，看三個數字就好：
+**掃到文章**、**有雷標籤**、**比對到片**。任何一個是 0 就是壞了。
+
+爬蟲會自己判斷「我是不是壞了」並**讓 Actions 紅掉**（抓到 0 篇文章、0 篇帶得到標籤、
+片單 0 部、一半以上的頁解析不到東西），同時印出診斷：URL、HTTP 狀態、HTML 前 500 字。
+**這是刻意的**——安靜產出一份空 JSON 的話，App 上只會顯示「沒有討論」，沒有人會知道爬蟲已經死了。
+
+要修的地方只有一處：`scripts/ptt-parse.mjs` 最上面的 `SELECTORS`，
+PTT 的網頁結構假設全部集中在那裡。
+
+> 做畫面的人：`test/fixtures/sample-ptt-movie.json` 是一份**用假測資產生的範例檔**（格式跟真的一樣，
+> 多一個 `_sample` 欄位標明它是假的）。可以先照它做 UI，不用等第一次 Actions 跑完。

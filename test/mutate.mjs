@@ -74,12 +74,37 @@ const M = [
   ["P20 mysubs 不過濾未知 key", "js/app.js", "  state.mysubs = state.mysubs.filter(knownBrand);\n", ""],
   ["P12 normProvider 拿掉 id 優先比對", "js/api.js", "    for (var k in HLM_BRAND) {\n      if (HLM_BRAND[k].id === p.provider_id) { key = k; break; }\n    }\n", ""],
   ["P02 provider 校正改成後者覆蓋前者", "js/api.js", "if (key && !map[key]) map[key] = arr[i].provider_id;", "if (key) map[key] = arr[i].provider_id;"],
+  /* ---- PTT 鄉民評價（scripts/ptt-parse.mjs、scripts/fetch-ptt.mjs） ---- */
+  ["T01 Re: 回文也算進票數", "scripts/ptt-parse.mjs", `  if (/^re\\s*[:：]/i.test(t)) return "reply";`, `  if (false) return "reply";`],
+  ["T02 置底板規文也算進去", "scripts/ptt-parse.mjs", `    if (starts[i] > sepAt) { skipped.pinned++; continue; }   /* 置底文不收 */`, `    if (false) { skipped.pinned++; continue; }`],
+  ["T03 標題不框在 div.title 裡（會抓到下拉選單的連結）", "scripts/ptt-parse.mjs", `    const link = SELECTORS.titleLink.exec(tb[1]);`, `    const link = SELECTORS.titleLink.exec(chunk);`],
+  ["T04 片名歧義時先命中先贏（會錯配）", "scripts/ptt-parse.mjs", `  if (hits.length > 1 && hits[1].score === hits[0].score && hits[1].id !== hits[0].id) {
+    return { id: null, reason: "ambiguous" };
+  }
+`, ``],
+  ["T05 短片名不管出現在哪裡都算", "scripts/ptt-parse.mjs", `        ok = pos >= 0 && (a.tight.length > MATCH.SHORT_CJK_MAX || pos <= MATCH.HEAD_CHARS);`, `        ok = pos >= 0;`],
+  ["T06 每部片不截斷成 8 則", "scripts/ptt-parse.mjs", `    m.posts = m.posts.slice(0, MATCH.MAX_POSTS);
+`, ``],
+  ["T07a 抓到 0 篇文章也放行（安靜產出空 JSON）", "scripts/ptt-parse.mjs", `  if (!st.posts) bad.push("整輪掃下來 0 篇文章 —— PTT 版面結構可能變了（見 SELECTORS）");
+  else `, `  `],
+  ["T07b 0 篇帶得到標籤也放行", "scripts/ptt-parse.mjs", `
+  else if (!st.tagged) bad.push("有文章但 0 篇帶得到雷標籤 —— 標籤寫法可能變了（見 parseTag）");`, ``],
+  ["T08 只有 updated 變也算變（每天一個空 commit）", "scripts/fetch-ptt.mjs", `  const strip = o => JSON.stringify({ source: o.source, scanned: o.scanned, movies: o.movies });`, `  const strip = o => JSON.stringify(o);`],
+  ["T09 記錄不遮金鑰", "scripts/fetch-ptt.mjs", `  return t.replace(/api_key=[^&\\s"']+/gi, "api_key=***");`, `  return t;`],
+  ["T10 爬取不睡（轟炸 PTT）", "scripts/fetch-ptt.mjs", `  sleepMs: 700,`, `  sleepMs: 0,`],
+  ["T11 不處理年齡確認頁", "scripts/fetch-ptt.mjs", `  if (r.status === 200 && isAgeGate(r.body)) {`, `  if (false) {`],
+  ["T12 User-Agent 塞中文（每個請求都會炸）", "scripts/fetch-ptt.mjs", `  ua: "Mozilla/5.0 (compatible; hao-lei-ma-bot/1.0; personal use, once a day)",`, `  ua: "Mozilla/5.0 (compatible; hao-lei-ma-bot/1.0; 個人用途)",`],
+  ["T13 翻頁不跟著「上頁」走（一直抓同一頁）", "scripts/fetch-ptt.mjs", `      url = parsed.prevUrl;`, `      url = url;`],
+  ["T14 翻到三個月前也不停", "scripts/fetch-ptt.mjs", `      if (oldest && oldest < cutoffTime) { stopReason = "翻到 " + CFG.daysBack + " 天以前了"; break; }`, `      if (false) { stopReason = "翻到 " + CFG.daysBack + " 天以前了"; break; }`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 
-/* 只雜湊 App 自己的檔案（node_modules 有兩萬個檔，每次都算會慢到不能用） */
+/* 只雜湊 App 自己的檔案（node_modules 有兩萬個檔，每次都算會慢到不能用）。
+   ⚠️ .git 也要排除：git 自己（甚至只是背景跑一次 git status）就會改寫 .git/index，
+   跑到一半誤判成「還原失敗」直接 exit 2 —— 2026-08-23 真的踩到過。
+   這支要驗的是「原始碼有沒有被還原」，.git 裡的東西不在範圍內。 */
 const hashAll = () => execFileSync("bash", ["-c",
-  `cd ${ROOT} && find . -path ./node_modules -prune -o -type f -print | sort | xargs sha256sum`]).toString();
+  `cd ${ROOT} && find . \\( -path ./node_modules -o -path ./.git \\) -prune -o -type f -print | sort | xargs sha256sum`]).toString();
 const BASE = hashAll();
 let CUR = null;
 const restore = () => { if (CUR) { writeFileSync(CUR.p, CUR.o); CUR = null; } };

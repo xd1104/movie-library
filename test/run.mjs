@@ -23,7 +23,8 @@ const NAME = {
   "t7-budget": "API 用量",
   "t8-regress": "迴歸（QA 退件後補）",
   "t9-storage": "快取淘汰與過期降級",
-  "t10-guards": "守衛（交辦項目與縱深防禦）"
+  "t10-guards": "守衛（交辦項目與縱深防禦）",
+  "t11-ptt": "PTT 鄉民評價（解析、比對、健康檢查）"
 };
 
 const results = await Promise.all(FILES.map(async f => {

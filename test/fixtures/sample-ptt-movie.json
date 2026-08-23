@@ -1,0 +1,83 @@
+{
+  "_sample": "⚠️ 這是用假測資產生的範例檔，給 lab-ux 做畫面用。真的檔案由 GitHub Actions 產在 data/ptt-movie.json。",
+  "updated": "2026-08-23T04:00:00Z",
+  "source": "https://www.ptt.cc/bbs/movie/index.html",
+  "scanned": {
+    "pages": 2,
+    "posts": 12,
+    "matched": 7,
+    "unmatched": 0
+  },
+  "movies": {
+    "653346": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好 雷] 猩球崛起：王國誕生 特效滿分",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786999000.A.102.html",
+          "date": "8/18",
+          "push": -50
+        }
+      ]
+    },
+    "693134": {
+      "good": 2,
+      "ok": 1,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 沙丘2 視聽的極致饗宴",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787184000.A.001.html",
+          "date": "8/20",
+          "push": 45
+        },
+        {
+          "tag": "普雷",
+          "title": "[普雷] 沙丘：第二部 有點長",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787183000.A.002.html",
+          "date": "8/20",
+          "push": 12
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 沙丘 & 沙丘：第二部 一起看完的心得",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786996000.A.105.html",
+          "date": "8/17",
+          "push": 9
+        }
+      ]
+    },
+    "1022789": {
+      "good": 1,
+      "ok": 0,
+      "bad": 2,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[ 好雷] 腦筋急轉彎2 大人小孩都會哭",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787000000.A.101.html",
+          "date": "8/18",
+          "push": 100
+        },
+        {
+          "tag": "負雷",
+          "title": "[負雷] 腦筋急轉彎2 不如第一集",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787100000.A.003.html",
+          "date": "8/19",
+          "push": 0
+        },
+        {
+          "tag": "負雷",
+          "title": "［負雷］腦筋急轉彎2 太吵了",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786998000.A.103.html",
+          "date": "8/18",
+          "push": -100
+        }
+      ]
+    }
+  }
+}
