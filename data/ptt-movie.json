@@ -1,11 +1,13 @@
 {
-  "updated": "2026-08-23T11:40:13Z",
+  "updated": "2026-08-23T14:37:32Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 797,
-    "matched": 92,
-    "unmatched": 66
+    "posts": 781,
+    "tagged": 156,
+    "matched": 103,
+    "ambiguous": 0,
+    "unmatched": 53
   },
   "movies": {
     "454639": {
@@ -23,10 +25,17 @@
       ]
     },
     "969681": {
-      "good": 32,
-      "ok": 13,
+      "good": 43,
+      "ok": 14,
       "bad": 6,
       "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 大推蜘蛛人 (無預備知識也好看)",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786339886.A.C6F.html",
+          "date": "8/10",
+          "push": 48
+        },
         {
           "tag": "普雷",
           "title": "[普雷] 不是很好看的蜘蛛人重生日...",
@@ -56,6 +65,13 @@
           "push": 38
         },
         {
+          "tag": "普雷",
+          "title": "[普雷] 說不上好看的蜘蛛人",
+          "url": "https://www.ptt.cc/bbs/movie/M.1785597683.A.C60.html",
+          "date": "8/01",
+          "push": 31
+        },
+        {
           "tag": "好雷",
           "title": "[好雷] 蜘蛛人-重生日-其實還是有缺點",
           "url": "https://www.ptt.cc/bbs/movie/M.1785375787.A.FC7.html",
@@ -68,20 +84,6 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1786726762.A.824.html",
           "date": "8/15",
           "push": 22
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人重生日 蜘蛛人長大了",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785301201.A.02F.html",
-          "date": "7/29",
-          "push": 21
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人：重生日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785391984.A.E33.html",
-          "date": "7/30",
-          "push": 20
         }
       ]
     },
@@ -261,7 +263,7 @@
       ]
     },
     "1368337": {
-      "good": 11,
+      "good": 10,
       "ok": 0,
       "bad": 1,
       "posts": [
@@ -316,10 +318,10 @@
         },
         {
           "tag": "好雷",
-          "title": "[好雷] 奧德賽 打算二刷了",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785248149.A.13B.html",
-          "date": "7/28",
-          "push": 4
+          "title": "[好雷] 奧德賽演義",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786005634.A.D51.html",
+          "date": "8/06",
+          "push": 2
         }
       ]
     },
