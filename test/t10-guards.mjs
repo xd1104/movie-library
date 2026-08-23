@@ -198,4 +198,91 @@ section("N-D2 Apple TV+ 與 Apple TV 不可以變成兩顆同名標籤");
     "★ 兩個分別顯示成 Apple TV 與 Apple TV+：" + out.flatrate.map(x => x.n).join("、"));
 }
 
+section("P05 「重新抓一次這部片」要連 OMDb 分數一起重抓");
+{
+  const { w, d, calls } = await boot({ store: ST });
+  await tick(w, 120);
+  d.querySelector(".row[data-open]").click(); await tick(w, 250);
+  const omdb1 = calls.list.filter(u => /omdbapi/.test(u)).length;
+  ok(omdb1 === 1, "第一次進詳細頁打了 1 次 OMDb");
+  ok(/IMDb/.test(html(d, "dbody")) && /5\.1/.test(html(d, "dbody")), "分數有出來");
+
+  /* 再進一次同一部片：走快取，不該有新的呼叫 */
+  $(d, "back").click(); await tick(w, 80);
+  d.querySelector(".row[data-open]").click(); await tick(w, 150);
+  ok(calls.list.filter(u => /omdbapi/.test(u)).length === omdb1, "對照組：一般重看走 7 天快取，不重打");
+
+  /* 按「重新抓一次這部片」 */
+  $(d, "refresh").click(); await tick(w, 300);
+  const omdb2 = calls.list.filter(u => /omdbapi/.test(u)).length;
+  ok(omdb2 === omdb1 + 1, "★ 按了重新抓 → OMDb 真的再打一次（" + omdb1 + " → " + omdb2 + "）");
+  ok(/5\.1/.test(html(d, "dbody")), "重抓後分數照樣畫得出來");
+  ok(calls.list.filter(u => /\/movie\/\d+\?/.test(u)).length >= 2, "TMDB 基本資料也重抓了");
+}
+
+section("P03 未知平台 key 的縱深防禦：層 A（開機過濾）要真的在做事");
+{
+  const { w, d } = await boot({ store: { ...ST, hlm_tab: "stream", hlm_pf: ["netflix", "hbogo"] } });
+  await tick(w, 200);
+  ok(!/skel/.test(html(d, "list")), "壞掉的 pf 不會讓片單卡在骨架");
+  ok(/目前只看：<b>Netflix<\/b>/.test(html(d, "hintline")),
+    "說明行只列認得的平台，沒有 undefined：" + html(d, "hintline").slice(0, 26));
+  ok(JSON.parse(w.localStorage.getItem("hlm_pf")).indexOf("hbogo") >= 0,
+    "開機不主動改寫 localStorage —— 他原本的選擇留著（平台哪天回來還在）");
+
+  /* 關鍵：他一動篩選，寫回去的就必須是乾淨的。
+     層 A 被拿掉的話，認不得的 key 會被一路寫回 localStorage、永遠賴著不走。 */
+  d.querySelector('[data-pf="disney"]').click(); await tick(w, 200);
+  const saved = JSON.parse(w.localStorage.getItem("hlm_pf"));
+  ok(saved.indexOf("hbogo") < 0, "★ 他一動篩選，寫回去的是乾淨的：" + JSON.stringify(saved));
+  ok(saved.indexOf("netflix") >= 0 && saved.indexOf("disney") >= 0, "認得的平台都在");
+}
+
+section("P20 hlm_mysubs 含未知 key 時不可以把爛資料帶進 pf");
+{
+  const { w, d } = await boot({ store: { ...ST, hlm_tab: "stream", hlm_mysubs: ["netflix", "hbogo", "已下架"] } });
+  await tick(w, 200);
+  ok(!/skel/.test(html(d, "list")) && /訂閱就能看/.test(txt(d, "listTitle")), "片單畫得出來：" + txt(d, "listTitle"));
+  ok(/目前只看你訂的：<b>Netflix<\/b>/.test(html(d, "hintline")),
+    "★ 只有認得的 Netflix 被當成預設：" + html(d, "hintline").slice(0, 34));
+  ok(!/undefined|hbogo|已下架/.test(html(d, "hintline")), "★ 壞掉的 key 不會漏到畫面上");
+  ok(d.querySelectorAll(".row[data-open]").length === 2, "篩選真的只套用 Netflix（2 部）");
+  /* 設定頁也不可以被壞資料弄爆 */
+  $(d, "gear").click(); await tick(w, 60);
+  ok(d.querySelectorAll("[data-sub]").length === 6, "設定頁的平台勾選區照樣畫得出來");
+  ok(d.querySelectorAll("[data-sub].on").length === 1, "★ 只有 Netflix 是勾起來的（壞 key 沒被當成勾選）");
+}
+
+section("P12 provider 用 id 優先比對（開機那次校正才有意義）");
+{
+  const { w } = await boot({ store: ST });
+  await tick(w, 60);
+  /* 校正過的 id 對到的品牌，即使名字完全認不得也要認得出來 */
+  const out = w.eval(`HLM_Api._normProviders({ results: { TW: { flatrate: [
+    { provider_id: 8, provider_name: "\u5b8c\u5168\u8a8d\u4e0d\u5f97\u7684\u540d\u5b57", logo_path: "/x.jpg", display_priority: 1 }
+  ] } } })`);
+  ok(out.flatrate[0].key === "netflix",
+    "★ 名字認不得但 provider_id 8 對得上 → 仍然是 Netflix（實際 " + out.flatrate[0].key + "）");
+  ok(out.flatrate[0].n === "Netflix" && out.flatrate[0].c === "#e50914", "顯示成 Netflix 品牌色塊");
+  /* 反過來：id 認不得、名字認得，走名字比對 */
+  const out2 = w.eval(`HLM_Api._normProviders({ results: { TW: { flatrate: [
+    { provider_id: 999999, provider_name: "Netflix", logo_path: "/n.jpg", display_priority: 1 }
+  ] } } })`);
+  ok(out2.flatrate[0].key === "netflix", "id 認不得就退回名字比對");
+}
+
+section("P02 provider id 校正要先到先贏（不可以被同品牌變體覆蓋）");
+{
+  const { w } = await boot({ store: ST });
+  await tick(w, 150);
+  const nf = w.eval("HLM_BRAND.netflix.id");
+  ok(nf === 8, "★ 校正後 netflix 的 id 是正牌的 8，不是廣告方案 1796（實際 " + nf + "）");
+  ok(w.eval("HLM_BRAND.disney.id") === 337, "其它平台照樣校正得到");
+  /* 用錯 id 的後果：串流片單會去要「廣告方案」的片庫 */
+  const { w: w2, d: d2, calls } = await boot({ store: { ...ST, hlm_tab: "stream", hlm_pf: ["netflix"] } });
+  await tick(w2, 200);
+  const disc = calls.list.filter(u => u.includes("/discover/movie")).pop() || "";
+  ok(/with_watch_providers=8(&|$)/.test(disc), "★ 片單請求帶的是 provider 8：" + (disc.match(/with_watch_providers=[^&]*/) || [""])[0]);
+}
+
 process.exit(summary() ? 1 : 0);

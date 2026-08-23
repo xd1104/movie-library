@@ -67,6 +67,8 @@ export function makeFetch(opts = {}) {
       if (p === "/3/configuration") return json({ images: {} });
       if (p === "/3/watch/providers/movie") return json({ results: [
         { provider_id: 8, provider_name: "Netflix" },
+        /* 官方清單裡「同品牌變體」會排在正牌後面（display_priority 較大）→ 校正時必須先到先贏 */
+        { provider_id: 1796, provider_name: "Netflix basic with Ads" },
         { provider_id: 337, provider_name: "Disney Plus" },
         { provider_id: 119, provider_name: "Amazon Prime Video" },
         { provider_id: 159, provider_name: "Catchplay+" },

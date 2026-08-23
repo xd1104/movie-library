@@ -2,7 +2,17 @@
    把每一件「應該被守住的事」各弄壞一次，確認測試真的會紅——
    「有測試」不等於「測試在保護那件事」，這支就是用來證明後者的。
    會暫時改動 js/ 底下的檔案，跑完一定還原，並用 SHA-256 比對確認一模一樣。
-   ⚠️ 跑的時候不要同時改專案裡的檔案（雜湊會對不起來）。 */
+   ⚠️ 跑的時候不要同時改專案裡的檔案（雜湊會對不起來）。
+
+   用法：
+     npm run test:mutate                跑全部（約 6 分鐘）
+     npm run test:mutate -- --dry       只檢查每條突變的目標字串還套不套得上（幾秒鐘）
+     npm run test:mutate -- --only=M40,R1  只跑指定前綴的突變
+
+   ⭐ 這支工具自己的鐵律（2026-08-23 QA 拿探針實測過，壞掉時它會謊報「一切安好」）：
+   ① 突變套不上（重構把目標字串改掉了）＝ **失敗**，不是警告。那條等於什麼都沒測。
+   ② 基準線本來就紅 ＝ 直接中止（exit 2）。基準線紅的話每條突變都會顯示「紅 ✓」，整份結果不可信。
+   ③ 「預期全綠」豁免名單要斷言長度，擋住有人把礙事的突變改個名字混過去。 */
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -15,6 +25,11 @@ import { readdirSync } from "node:fs";
 const TESTDIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(TESTDIR, "..");
 const TESTS = readdirSync(TESTDIR).filter(f => /^t\d+-.*\.mjs$/.test(f)).map(f => f.replace(/\.mjs$/, ""));
+
+/* 版本號一定要從程式碼讀出來，不可以寫死在突變表裡——
+   寫死的話每次改版都會讓這幾條突變靜默失效（2026-08-23 v1.0.1 改版就真的踩到了）*/
+const VERLINE = /var HLM_VER = "[^"]+";/.exec(readFileSync(ROOT + "/js/config.js", "utf8"))[0];
+const SWBUILD = /^\/\* build ([0-9.]+) \*\//m.exec(readFileSync(ROOT + "/sw.js", "utf8"))[1];
 
 const M = [
   ["M40 串流拿掉成人過濾", "js/api.js", "        with_watch_monetization_types: \"flatrate\",\n        with_watch_providers: ids.join(\"|\"),\n        sort_by: \"popularity.desc\",\n        include_adult: false,\n", "        with_watch_monetization_types: \"flatrate\",\n        with_watch_providers: ids.join(\"|\"),\n        sort_by: \"popularity.desc\",\n"],
@@ -34,21 +49,26 @@ const M = [
   ["R2a 第一次安裝就 reload", "js/app.js", "            if (!hadController) return;          /* 第一次安裝，不是更新 */\n            $(\"updatebar\").classList.remove(\"hide\");", "            location.reload();"],
   ["R2b 收到新版自動 reload", "js/app.js", "            if (!hadController) return;          /* 第一次安裝，不是更新 */\n            $(\"updatebar\").classList.remove(\"hide\");", "            if (hadController) location.reload();"],
   ["R3 拿掉同品牌去重", "js/api.js", "        if (seen[b.key]) continue;\n        seen[b.key] = true;\n", ""],
-  ["R1c 只拿掉開機清理（層 B 接不到，預期全綠）", "js/app.js", "  /* 認不得的平台 key（舊版留下的、或 TMDB 那邊改名下架）直接丟掉，不要留著當地雷。\n     只在記憶體裡濾掉，不寫回 localStorage。 */\n  state.pf = state.pf.filter(knownBrand);\n", ""],
+  ["R1c 只拿掉層 A（開機過濾）", "js/app.js", "  /* 認不得的平台 key（舊版留下的、或 TMDB 那邊改名下架）直接丟掉，不要留著當地雷。\n     只在記憶體裡濾掉，不寫回 localStorage。 */\n  state.pf = state.pf.filter(knownBrand);\n", ""],
   ["R1d 兩層守衛都拿掉", "js/app.js", [["  /* 認不得的平台 key（舊版留下的、或 TMDB 那邊改名下架）直接丟掉，不要留著當地雷。\n     只在記憶體裡濾掉，不寫回 localStorage。 */\n  state.pf = state.pf.filter(knownBrand);\n", ""], ["      var b = HLM_BRAND[state.pf[i]];\n      if (b) out.push(b.n);", "      out.push(HLM_BRAND[state.pf[i]].n);"]], null],
   ["N07 拿掉 eyJ 偵測", "js/api.js", "    if (key.indexOf(\"eyJ\") === 0) {", "    if (false) {"],
   ["N09 maskable icon 不進殼快取", "sw.js", ",\n  \"./icons/icon-512-maskable.png\"", ""],
   ["N13 本週門檻改成 70 天", "js/ui.js", "days !== null && days <= 7", "days !== null && days <= 70"],
   ["N14 --faint 調回低對比", "css/app.css", "--faint:#7d8798;", "--faint:#6b7484;"],
   ["N15 ✕ 命中區縮小", "css/app.css", ".chip .x{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;", ".chip .x{display:inline-flex;align-items:center;justify-content:center;width:20px;height:22px;"],
-  ["N16a 拿掉 sw.js 的 build 字串", "sw.js", "/* build 1.0.0 */\n", ""],
-  ["N16b build 沒跟著 HLM_VER 走", "sw.js", "/* build 1.0.0 */", "/* build 0.9.0 */"],
+  ["N16a 拿掉 sw.js 的 build 字串", "sw.js", "/* build " + SWBUILD + " */\n", ""],
+  ["N16b build 沒跟著 HLM_VER 走", "sw.js", "/* build " + SWBUILD + " */", "/* build 0.0.1 */"],
   ["N34 entryTime 永遠回 0", "js/store.js", "      return o && typeof o.t === \"number\" ? o.t : 0;", "      return 0;"],
   ["N21 去重前不排序", "js/api.js", "      var sorted = (arr || []).slice().sort(function (a, b) {\n        return (a.display_priority || 99) - (b.display_priority || 99);\n      });", "      var sorted = (arr || []).slice();"],
   ["N1a SW 存取搬回頂層（沒保護）", "js/app.js", "  function setupSW() {\n    try {\n      var sw = navigator.serviceWorker;\n      if (!sw || typeof sw.register !== \"function\") return;\n      var hadController = !!sw.controller;", "  function setupSW() {\n    {\n      var sw = navigator.serviceWorker;\n      var hadController = !!navigator.serviceWorker.controller;"],
   ["N2a 沒設過 hlm_pf 不吃 mysubs", "js/app.js", "  if (!Array.isArray(state.pf)) state.pf = state.mysubs.slice();", "  if (!Array.isArray(state.pf)) state.pf = [];"],
   ["D2 品牌比對改回先命中先贏", "js/api.js", "if (nm.indexOf(ms[i]) >= 0 && ms[i].length > bestLen) { best = k; bestLen = ms[i].length; }", "if (nm.indexOf(ms[i]) >= 0 && bestLen === 0) { best = k; bestLen = ms[i].length; }"],
-  ["對照組 無害改動（預期全綠）", "js/config.js", 'var HLM_VER = "1.0.0";', 'var HLM_VER = "1.0.0"; /* 註解 */']
+  ["P05 重新抓一次不清 OMDb 快取", "js/app.js", "      if (force) S.cacheDel(\"o:\" + mv.imdb);", "      if (false) S.cacheDel(\"o:\" + mv.imdb);"],
+  ["P03 拿掉層 A（開機過濾未知平台 key）", "js/app.js", "  state.pf = state.pf.filter(knownBrand);\n", ""],
+  ["P20 mysubs 不過濾未知 key", "js/app.js", "  state.mysubs = state.mysubs.filter(knownBrand);\n", ""],
+  ["P12 normProvider 拿掉 id 優先比對", "js/api.js", "    for (var k in HLM_BRAND) {\n      if (HLM_BRAND[k].id === p.provider_id) { key = k; break; }\n    }\n", ""],
+  ["P02 provider 校正改成後者覆蓋前者", "js/api.js", "if (key && !map[key]) map[key] = arr[i].provider_id;", "if (key) map[key] = arr[i].provider_id;"],
+  ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 
 /* 只雜湊 App 自己的檔案（node_modules 有兩萬個檔，每次都算會慢到不能用） */
@@ -65,35 +85,115 @@ async function runAll() {
   return rs.filter(Boolean);
 }
 
-const base = await runAll();
-console.log("基準線（沒有突變）：" + (base.length ? "❌ 有測試本來就紅 → " + base.join(",") : "全綠 ✓") + "\n");
+/* ---------- 參數 ---------- */
+const ARGV = process.argv.slice(2);
+const DRY = ARGV.includes("--dry");
+const ONLY = (ARGV.find(a => a.startsWith("--only=")) || "").replace("--only=", "");
+const onlyList = ONLY ? ONLY.split(",").filter(Boolean) : null;
+const picked = M.filter(m => !onlyList || onlyList.some(o => m[0].indexOf(o) === 0));
 
+/* 「預期全綠」是刻意的，目前只有 2 條：
+     R1a  只拿掉 pfNames（層 B 的備援守衛）→ 層 A 會接住，看不出差別
+     對照組 無害改動
+   數量寫死在這裡，多一條少一條都要有人重新想過——不可以靠改名字把礙事的突變混進豁免。
+   （R1c「只拿掉層 A」本來也在豁免名單裡，2026-08-23 補了 P03 測試之後它會紅了，
+     所以移出豁免。工具會自己抓到這種狀況並要求重新檢視，這是刻意的。） */
+const EXEMPT_COUNT = 2;
+const exemptDefined = M.filter(m => /預期全綠/.test(m[0]));
+
+function pairsOf(from, to) { return Array.isArray(from) ? from : [[from, to]]; }
+function staleTargets(file, from, to) {
+  const src = readFileSync(ROOT + "/" + file, "utf8");
+  return pairsOf(from, to).filter(([f]) => src.indexOf(f) < 0);
+}
+
+/* ---------- 乾跑：只驗突變套不套得上 ---------- */
+if (DRY) {
+  console.log("\n乾跑：檢查每條突變的目標字串還在不在（不實際跑測試）\n");
+  const stale = [];
+  for (const [id, file, from, to] of picked) {
+    const bad = staleTargets(file, from, to);
+    console.log("  " + (bad.length ? "✗" : "✓") + " " + id + (bad.length ? "  ← 目標字串已失效（" + file + "）" : ""));
+    if (bad.length) stale.push(id);
+  }
+  console.log("\n" + "─".repeat(52));
+  if (stale.length) {
+    console.log("  ❌ " + stale.length + " / " + picked.length + " 條突變已經失效。");
+    console.log("  重構把目標字串改掉了 → 那幾件事現在【沒有任何人在驗】。");
+    console.log("  請把 test/mutate.mjs 裡的目標字串對齊現在的程式碼。");
+  } else {
+    console.log("  ✓ " + picked.length + " 條突變全部都還套得上");
+  }
+  console.log("─".repeat(52) + "\n");
+  process.exit(stale.length ? 1 : 0);
+}
+
+/* ---------- A-3 豁免名單長度 ---------- */
+if (exemptDefined.length !== EXEMPT_COUNT) {
+  console.error("❌ 「預期全綠」豁免名單長度不對：預期 " + EXEMPT_COUNT + " 條，實際 " + exemptDefined.length + " 條");
+  console.error("   目前是：" + exemptDefined.map(m => m[0]).join("、"));
+  console.error("   有人新增／刪掉豁免了嗎？請確認每一條真的該豁免，再改 EXEMPT_COUNT。");
+  process.exit(1);
+}
+
+/* ---------- 基準線 ---------- */
+const base = await runAll();
+if (base.length) {
+  console.error("\n❌ 基準線就是紅的：" + base.join("、"));
+  console.error("   整份突變結果不可信 —— 基準線紅的話，每一條突變都會顯示「紅 ✓」，");
+  console.error("   工具會給你滿分，但其實什麼都沒證明。");
+  console.error("   先把 npm test 弄成全綠，再跑這支。\n");
+  process.exit(2);
+}
+console.log("基準線（沒有突變）：全綠 ✓\n");
+
+/* ---------- 逐條突變 ---------- */
 const rows = [];
-for (const [id, file, from, to] of M) {
+for (const [id, file, from, to] of picked) {
   const p = ROOT + "/" + file;
   const o = readFileSync(p, "utf8");
-  const pairs = Array.isArray(from) ? from : [[from, to]];
-  if (pairs.some(([f]) => o.indexOf(f) < 0)) { rows.push([id, "⚠️ 找不到目標字串（突變沒套用）", ""]); continue; }
+  const bad = staleTargets(file, from, to);
+  if (bad.length) {
+    /* 套不上 = 這件事現在沒人在驗 = 失敗（不是警告） */
+    rows.push({ id, status: "stale", detail: file });
+    continue;
+  }
   CUR = { p, o };
   let mutated = o;
-  for (const [f, t2] of pairs) mutated = mutated.split(f).join(t2);
+  for (const [f, t2] of pairsOf(from, to)) mutated = mutated.split(f).join(t2);
   writeFileSync(p, mutated);
   process.stderr.write("  跑 " + id + "\n");
   let red = [];
   try { red = await runAll(); } finally { restore(); }
   if (hashAll() !== BASE) { console.error("!!! 還原失敗：" + id); process.exit(2); }
-  rows.push([id, red.length ? "紅 ✓" : "❌ 全綠（沒守住）", red.join(",")]);
+  rows.push({ id, status: red.length ? "red" : "green", detail: red.join(",") });
 }
 
+/* ---------- 報告 ---------- */
+const MARK = { red: "紅 ✓", green: "❌ 全綠（沒守住）", stale: "❌ 突變失效（目標字串不存在）" };
 console.log("| 弄壞什麼 | 測試有沒有紅 | 哪個測試檔抓到 |");
 console.log("|---|---|---|");
-for (const r of rows) console.log(`| ${r[0]} | ${r[1]} | ${r[2]} |`);
-const miss = rows.filter(r => r[1].startsWith("❌"));
-console.log("\n沒守住的：" + (miss.length ? miss.map(r => r[0]).join("、") : "無"));
-console.log("還原驗證（SHA-256）：一致 ✓");
-/* 名稱裡標了「預期全綠」的是刻意的（縱深防禦的備援層、對照組），其餘全綠就是測試沒守住 */
-const unexpected = miss.filter(r => !/預期全綠/.test(r[0]));
-console.log(unexpected.length
-  ? "\n❌ 有 " + unexpected.length + " 件事沒有測試在守：" + unexpected.map(r => r[0]).join("、")
-  : "\n✓ 每一件該守的事都有測試在守（標『預期全綠』的是刻意的備援層／對照組）");
-process.exit(unexpected.length ? 1 : 0);
+for (const r of rows) console.log(`| ${r.id} | ${MARK[r.status]} | ${r.detail} |`);
+
+const stale = rows.filter(r => r.status === "stale");
+const green = rows.filter(r => r.status === "green");
+const unexpectedGreen = green.filter(r => !/預期全綠/.test(r.id));
+const exemptTurnedRed = rows.filter(r => /預期全綠/.test(r.id) && r.status === "red");
+
+console.log("\n還原驗證（SHA-256）：一致 ✓");
+console.log("統計：" + rows.length + " 條突變 → 紅 " + rows.filter(r => r.status === "red").length +
+  "、預期全綠 " + green.filter(r => /預期全綠/.test(r.id)).length +
+  "、沒守住 " + unexpectedGreen.length + "、失效 " + stale.length);
+
+const problems = [];
+if (stale.length) problems.push("突變失效 " + stale.length + " 條（那幾件事現在沒人在驗）：" + stale.map(r => r.id).join("、"));
+if (unexpectedGreen.length) problems.push("沒有測試在守 " + unexpectedGreen.length + " 條：" + unexpectedGreen.map(r => r.id).join("、"));
+if (exemptTurnedRed.length) problems.push("豁免名單裡的突變現在會紅了（狀況變了，請重新檢視豁免）：" + exemptTurnedRed.map(r => r.id).join("、"));
+
+console.log("");
+if (problems.length) {
+  for (const x of problems) console.log("❌ " + x);
+  process.exit(1);
+}
+console.log("✓ 每一件該守的事都有測試在守，且每一條突變都真的套用過（標『預期全綠』的是刻意的備援層／對照組）");
+process.exit(0);
