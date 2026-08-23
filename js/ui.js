@@ -529,12 +529,44 @@ var HLM_UI = (function () {
     }).join("");
   }
 
+  /* 鑰匙圈那一張卡。⚠️ 兩條路要並存：鑰匙圈解不開（忘記密碼／被收回／離線）時，
+     手貼金鑰那條路一定要還在，不可以讓 App 變成完全不能用。
+     ⚠️ 不可以在這裡寫任何 kr- 的樣式或自己畫解鎖畫面——那是跨 App 公版，模組自己帶。 */
+  function keyringCard(k, firstRun) {
+    if (!k.krOn) return "";
+    var err = k.krErr
+      ? '<div class="warn"><span class="warnmark">!</span><span><b>' + esc(k.krErr.t) + "</b><br>" + esc(k.krErr.b) + "</span></div>"
+      : "";
+    /* 三種狀態，不是兩種。
+       ⚠️ 「解鎖了」不等於「金鑰進來了」——後台那一格還沒填就先解鎖，
+       是老闆很可能遇到的**第一個**狀態。這時候還說「下面那兩格會自動填好」就是騙人。 */
+    var body;
+    if (k.krUnlocked && k.tmdb) {
+      body = '<p class="sub" style="margin:0 0 12px">這台裝置已經解鎖，金鑰是鑰匙圈帶進來的。下面那兩格會自動填好，平常不用動。</p>';
+    } else if (k.krUnlocked) {
+      body = '<div class="warn"><span class="warnmark">!</span><span>' +
+        "<b>鑰匙圈解開了，但裡面還沒放這個 App 的金鑰。</b><br>" +
+        "去鑰匙圈後台，在「好雷嗎」那一格貼上這樣一整行：<br>" +
+        esc('{"tmdb":"你的 TMDB 金鑰","omdb":"你的 OMDb 金鑰"}') + "<br>" +
+        "（代號要填 <b>movie-library</b>）。存檔之後回到這裡重開一次就會自動填好。<br>" +
+        "不想現在弄的話，往下自己貼一樣能用。</span></div>";
+    } else {
+      body = '<p class="sub" style="margin:0 0 12px">' + (firstRun
+        ? "如果你已經把金鑰放進鑰匙圈了，<b>解鎖一次就好，不用手貼</b>。"
+        : "解鎖之後金鑰會自動填進來。") + "沒有鑰匙圈也沒關係，往下自己貼一樣能用。</p>";
+    }
+    return '<div class="card step"><h3>' + (firstRun ? '<span class="n">0</span>' : "") + "用鑰匙圈（最快）</h3>" +
+      body + err + '<div id="krslot2"></div></div>';
+  }
+
   function setupHTML(k, firstRun) {
     return '<div class="setup">' +
       "<h2>" + (firstRun ? "先設定一次，之後就不用了" : "設定") + "</h2>" +
       '<p class="lead">' + (firstRun
         ? "「好雷嗎?」自己沒有電影資料庫，是去 TMDB 和 OMDb 幫你查。<br>這兩個網站都免費，但要用<b>你自己的金鑰</b>。申請大概 5 分鐘，<b>只要做這一次</b>。<br>金鑰只存在這支手機裡，不會傳給任何人。"
         : "金鑰只存在這支手機的瀏覽器裡，不會上傳、也不在程式碼裡。") + "</p>" +
+
+      keyringCard(k, firstRun) +
 
       '<div class="card step"><h3><span class="n">1</span>TMDB 金鑰（必要）</h3>' +
       "<ol>" +

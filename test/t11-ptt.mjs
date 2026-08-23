@@ -375,16 +375,33 @@ section("12. 網址白名單：只能是 ptt.cc（毒測資）");
   ok(c.posts.every(p => PTT_URL_RE.test(p.url)), "★ 留下來的網址全部是 ptt.cc", c.posts.map(p => p.url).join(" "));
   ok(c.posts[0].url === "https://www.ptt.cc/bbs/movie/M.1787184001.A.C01.html", "站內絕對網址有升級成 https");
 
-  /* 第二道關卡：就算有人繞過 absUrl 把髒東西塞進 entries，也不可以寫進檔案 */
-  const dirty = [
-    { movieId: "1", tag: "好雷", title: "乾淨的", url: "https://www.ptt.cc/bbs/movie/M.1.A.A.html", date: "8/1", push: 9 },
-    { movieId: "1", tag: "好雷", title: "毒的", url: "javascript:window.__pwn5=1", date: "8/1", push: 99 },
-    { movieId: "1", tag: "負雷", title: "外站", url: "https://evil.example.com/x", date: "8/1", push: 98 }
+  /* 第二道關卡：就算有人繞過 absUrl 把髒東西塞進 entries，也不可以寫進檔案。
+     ⚠️ 這份毒清單要跟第一道一樣完整——包含「字串裡含 ptt.cc」與「http 開頭」，
+     否則 PTT_URL_RE 被改掉 ^ 或改成 https? 都沒有人會喊（QA 2026-08-23）。 */
+  const POISON_URLS = [
+    "javascript:window.__pwn5=1",
+    "data:text/html,<h1>x",
+    "https://evil.example.com/x",
+    "//evil.example.com/x",
+    "https://evil.example.com/?u=https://www.ptt.cc/bbs/movie/x.html",   /* 少了 ^ 就會過 */
+    "http://www.ptt.cc/bbs/movie/x.html",                                 /* 改成 https? 就會過 */
+    "https://www.pttxcc/bbs/movie/x.html",                                /* 點號沒跳脫就會過 */
+    "https://notptt.cc/x",
+    "HTTPS://WWW.PTT.CC/bbs/movie/x.html"                                 /* 大小寫繞過 */
   ];
+  const dirty = [
+    { movieId: "1", tag: "好雷", title: "乾淨的", url: "https://www.ptt.cc/bbs/movie/M.1.A.A.html", date: "8/1", push: 9 }
+  ].concat(POISON_URLS.map((u, i) => ({ movieId: "1", tag: "好雷", title: "毒 " + i, url: u, date: "8/1", push: 90 + i })));
   const dp = buildPayload({ entries: dirty, scanned: {}, source: CFG.index });
   ok(dp.movies["1"].posts.length === 1 && PTT_URL_RE.test(dp.movies["1"].posts[0].url),
-    "★ buildPayload 只寫得出 ptt.cc 的網址", JSON.stringify(dp.movies["1"].posts.map(p => p.url)));
+    "★ buildPayload 只寫得出 ptt.cc 的網址（" + POISON_URLS.length + " 種毒全擋）",
+    JSON.stringify(dp.movies["1"].posts.map(p => p.url)));
   ok(dp.movies["1"].good === 1 && dp.movies["1"].bad === 0, "被擋掉的那幾篇連票數都不算");
+  for (const u of POISON_URLS) {
+    const one = buildPayload({ entries: [{ movieId: "1", tag: "好雷", title: "t", url: u, date: "8/1", push: 1 }],
+      scanned: {}, source: CFG.index });
+    ok(!one.movies["1"], "★ 只有毒的話整部片都不該出現：" + u);
+  }
 }
 
 process.exit(summary() ? 1 : 0);

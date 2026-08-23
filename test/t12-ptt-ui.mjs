@@ -274,6 +274,10 @@ section("42. 文章網址白名單：資料檔被污染也不可以變成任意�
     ["//evil.example.com/x", "protocol-relative"],
     ["http://ptt.cc/x.html", "http（不是 https）"],
     ["https://notptt.cc/x", "相似網域"],
+    /* ↓ 這兩筆是防「白名單被改壞」的，不是防「白名單不見」——
+       安全性程式碼真實的退化方式是有人順手改一下正則（QA 2026-08-23） */
+    ["https://evil.example.com/?x=https://www.ptt.cc/", "字串裡含 ptt.cc（少了開頭錨定 ^ 就會過）"],
+    ["https://www.pttxcc/bbs/movie/x.html", "pttXcc（點號沒跳脫就會過）"],
     ["", "空的"]
   ];
   for (const [url, why] of POISON) {

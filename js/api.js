@@ -123,6 +123,24 @@ var HLM_Api = (function () {
     };
   }
 
+  /* ---------- 鑰匙圈：一個條目裝兩把金鑰 ----------
+     鑰匙圈模組一個 App 只吃**一個** localStorage key（它原本是為 GitHub PAT 設計的），
+     我們有 TMDB＋OMDb 兩把，所以後台那一格存的是打包好的 JSON：
+         {"tmdb":"<32碼>","omdb":"<8碼>"}
+     ⚠️ 老闆是手貼進後台的，**貼錯是常態不是邊緣案例**，所以解析失敗一定要給人話錯誤。
+     ⚠️ 只有 tmdb 沒有 omdb 也要能用（跟「只填 TMDB 也能用」那條一致）。 */
+  function parseKeyringBlob(raw) {
+    var s = String(raw == null ? "" : raw).trim();
+    if (!s) throw err("keyringbad", "keyring", "空的");
+    var o = null;
+    try { o = JSON.parse(s); } catch (e) { o = null; }
+    if (!o || typeof o !== "object" || Array.isArray(o)) throw err("keyringbad", "keyring", "不是一個 JSON 物件");
+    var t = String(o.tmdb == null ? "" : o.tmdb).trim();
+    var m = String(o.omdb == null ? "" : o.omdb).trim();
+    if (!t) throw err("keyringbad", "keyring", "裡面沒有 tmdb 這一項");
+    return { tmdb: t, omdb: m };
+  }
+
   /* ---------- 錯誤 → 人話 ---------- */
   function human(e) {
     var kind = (e && e.kind) || "unknown";
@@ -146,6 +164,13 @@ var HLM_Api = (function () {
           ? "OMDb 免費版一天 1000 次。IMDb／爛番茄／Metacritic 分數今天查不到了，明天會自動恢復；TMDB 的資料還是正常。"
           : "短時間內問太多次，被 TMDB 暫時擋下。等十幾秒再試就好，額度沒有被扣。",
         a: "retry", al: "重試"
+      },
+      keyringbad: {
+        t: "鑰匙圈裡的內容格式不對",
+        b: "「好雷嗎」那一格要放這樣一整行："
+          + '{"tmdb":"你的 TMDB 金鑰","omdb":"你的 OMDb 金鑰"}'
+          + "（沒有 OMDb 的話留空字串就好）。去鑰匙圈後台改成這個格式，或先在設定頁自己貼一次。",
+        a: "setup", al: "去設定頁自己貼"
       },
       offline: {
         t: "連不上網路",
@@ -438,7 +463,7 @@ var HLM_Api = (function () {
   }
 
   return {
-    err: err, human: human, ptt: ptt, pttFor: pttFor,
+    err: err, human: human, ptt: ptt, pttFor: pttFor, parseKeyringBlob: parseKeyringBlob,
     syncProviderIds: syncProviderIds,
     cinemaList: cinemaList, streamList: streamList, search: search,
     movie: movie, providers: providers, providersCachedOnly: providersCachedOnly, scores: scores,

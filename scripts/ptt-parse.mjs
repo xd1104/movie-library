@@ -361,14 +361,17 @@ export function matchTitle(titleNoTag, index) {
 export function buildPayload({ entries, scanned, source, updated }) {
   const movies = {};
   for (const e of entries || []) {
-    const id = String(e.movieId);
-    if (!movies[id]) movies[id] = { good: 0, ok: 0, bad: 0, posts: [] };
     const slot = TAGS[e.tag];
     if (!slot) continue;
     /* 寫進檔案前的最後一關：url 不是 ptt.cc 的一律不寫。
        這一層跟 absUrl() 是兩道**各自獨立**的關卡（各自有測試在守）——
        檔案一旦被寫壞，App 那邊就會渲染成可以點的外站連結。 */
     if (!PTT_URL_RE.test(String(e.url || ""))) continue;
+    /* ⚠️ 兩道檢查都過了才建立這部片的條目。
+       先建立再檢查的話，「所有文章都被擋掉」的片會留下一筆 0/0/0 的空殼，
+       違反「沒有討論的片不要出現在 movies 裡」的契約（2026-08-23 自己的毒測資抓到）。 */
+    const id = String(e.movieId);
+    if (!movies[id]) movies[id] = { good: 0, ok: 0, bad: 0, posts: [] };
     movies[id][slot]++;                       /* 計數用全部的文章，不是只用留下來那 8 則 */
     movies[id].posts.push({
       tag: e.tag, title: e.title, url: e.url, date: e.date || "", push: e.push || 0

@@ -257,6 +257,90 @@
     for (var c = 0; c < 3; c++) next();
   }
 
+  /* ---------- 鑰匙圈（跨 App 身分） ----------
+     它幫我們做的事只有一件：把後台那一格解密出來、寫進 C.krBlobKey。
+     「一個條目要裝兩把金鑰」是我們自己的事——所以那一格存的是 JSON blob，
+     解析與寫進 hlm_key_tmdb／hlm_key_omdb 都在這裡做。
+     ⚠️ 三條界線：
+     ① 鑰匙圈壞掉／沒載到，App 一定要照常能用（手貼那條路永遠留著）→ 全部包 try/catch。
+     ② 解不開／被收回 → 只清「鑰匙圈給的」金鑰，他自己手貼的不可以動。
+     ③ 不要在我們的 CSS 裡寫任何 kr- 規則（解鎖畫面是跨 App 公版，模組自己帶樣式）。 */
+  var krErr = null;         /* blob 格式不對時記下來，設定頁要顯示人話 */
+
+  /* ⚠️ 存取這個模組的**每一個點**都要包起來，而且要連「讀屬性」本身一起包。
+     它是跨 App 公版的複製品：**正本改了 API、我們這份沒跟上（版本落差）**，
+     是共用模組最常見的退化方式，症狀是同步擲出 → 整支 app.js 停掉 → 連手貼金鑰的逃生門都不見。
+     判準不是「我有沒有包 try/catch」，而是「**boot() 這條路上總共碰了模組幾次**」：
+     `grep -rn "Keyring\." js/*.js` 目前是 5 個存取點，t13 §55 用樁把每一個各打壞四種。
+     （唯一不走 krTry 的是 Keyring.init，它的守衛是啟動那段的 try/catch——
+       兩層都包的話那層就變成沒人守得住的死碼，K07 也會失去意義。） */
+  function krTry(fn, fallback) {
+    try { return fn(); } catch (e) { return fallback; }
+  }
+  function krOn() {
+    return krTry(function () { return !!(window.Keyring && typeof window.Keyring.init === "function"); }, false);
+  }
+
+  /* 把鑰匙圈解出來的 blob 拆成兩把金鑰。回傳金鑰有沒有變。 */
+  function krApply(loud) {
+    var b = null;
+    try { b = S.keyringBlob(); } catch (e) { b = null; }
+    if (!b) return false;
+    var pair;
+    try { pair = Api.parseKeyringBlob(b.raw); }
+    catch (e) {
+      krErr = e;
+      if (loud) toast(Api.human(e).t);
+      return false;
+    }
+    krErr = null;
+    var now = S.keys();
+    if (S.keysFromKeyring() && now.tmdb === pair.tmdb && now.omdb === pair.omdb) return false;
+    S.saveKeysFromKeyring(pair.tmdb, pair.omdb, b.remember);
+    return true;
+  }
+
+  /* 身分藥丸：模組自己產生 HTML，我們只負責給位置與重畫 */
+  function krPaintChip() {
+    if (!krOn()) return;
+    var slots = ["krslot", "krslot2"], i, el;
+    for (i = 0; i < slots.length; i++) {
+      el = $(slots[i]);
+      if (el) el.innerHTML = krTry(function () { return String(Keyring.chipHtml() || ""); }, "");
+    }
+  }
+
+  /* 解鎖／換人／換金鑰／被收回都會走這裡 */
+  function krChanged(st) {
+    var had = hasTmdbKey();
+    var changed = (st && st.unlocked) ? krApply(true) : S.clearKeyringKeys();
+    $("gear").classList.toggle("warn", !hasTmdbKey());
+    krPaintChip();
+    if (!changed) return;
+    if (hasTmdbKey() && !had) toast("鑰匙圈已解鎖，金鑰帶進來了");
+    if (state.view === "setup") {
+      /* 本來卡在「還不能用」的引導畫面 → 現在有金鑰了，直接把他送去片單 */
+      if (!had && hasTmdbKey()) { showHome(false); afterSetup(); return; }
+      renderSetup(!hasTmdbKey());
+      return;
+    }
+    if (state.view === "home") loadList();
+  }
+
+  function setupKeyring() {
+    if (!krOn()) return;
+    Keyring.init({
+      appId: C.krAppId,          /* ASCII，跟 repo 同名（鑰匙圈的 id 鐵律） */
+      appName: C.krAppName,
+      tokenKey: C.krBlobKey,     /* ⚠️ 專用的新 key，不是 hlm_key_tmdb */
+      toast: toast,
+      onChange: krChanged
+    });
+    /* init() 已經把記住的內容同步寫回 krBlobKey，所以這裡拆一次，
+       boot() 的自我體檢才看得到金鑰（順序不能反）。第一次進站沒解過鎖就什麼都不會發生。 */
+    krApply(false);
+  }
+
   /* ---------- PTT 鄉民風向 ----------
      整份 JSON 一次抓、一個 session 只抓一次（Api.ptt 自己記住結果）。
      這裡只放「畫面現在該顯示哪一種狀態」，資料與快取邏輯在 api.js。 */
@@ -409,7 +493,11 @@
     window.scrollTo(0, 0);
     var k = S.keys();
     k.mysubs = state.mysubs;
+    k.krOn = krOn();
+    k.krUnlocked = krOn() && krTry(function () { return !!Keyring.isUnlocked(); }, false);
+    k.krErr = krErr ? Api.human(krErr) : null;
     $("sbody").innerHTML = UI.setupHTML(k, firstRun);
+    krPaintChip();
     var st = S.cacheStats();
     $("cachestat").textContent = "目前存了 " + st.n + " 筆資料（約 " + st.kb + " KB）。清掉之後下次會重新跟 TMDB 要，額度也會多用一點。";
     if (!S.lsOK) {
@@ -449,6 +537,9 @@
     $("view-setup").classList.remove("on");
     $("view-home").style.display = "block";
     $("gear").classList.toggle("warn", !hasTmdbKey());
+    krPaintChip();
+    /* 第一次進站主動端一次解鎖畫面（之後永遠不再自動彈，模組自己記） */
+    if (krOn()) krTry(function () { Keyring.maybeIntro(); });
     window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);
   }
 
@@ -683,7 +774,12 @@
     } catch (e) { }
   }
 
-  /* boot() 先跑：App 能不能用，永遠優先於 PWA 的加值功能 */
+  /* 順序有意義：
+     ① 鑰匙圈先跑——它會把金鑰塞回 localStorage，boot() 的自我體檢才不會誤判成「還沒設定」。
+        包 try/catch：鑰匙圈壞掉頂多回到「自己貼金鑰」那條路，不可以讓 App 打不開。
+     ② boot()。
+     ③ SW 最後（見上面第 ③ 點）：App 能不能用，永遠優先於 PWA 的加值功能。 */
+  try { setupKeyring(); } catch (e) { }
   boot();
   setupSW();
 })();

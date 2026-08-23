@@ -60,6 +60,8 @@
       <p class="hintline" id="hintline"></p>
       <div class="rowlist" id="list"></div>
       <div id="emptyBox"></div>
+      <!-- 鑰匙圈的身分藥丸（模組自己產生 HTML，我們只給位置） -->
+      <div class="homefoot" id="krslot"></div>
     </div>
   </section>
 
@@ -97,6 +99,10 @@
   <div class="toast" id="toast"></div>
 </div>
 
+<!-- 鑰匙圈（跨 App 身分模組）：一定要在我們自己的 js 之前載入。
+     它是 xd1104/keyring 的 client/keyring-unlock.js 複製過來的，**不要在這裡改它**，
+     要改去那個 repo 改（我們這邊也不可以寫任何 kr- 開頭的 CSS）。 -->
+<script src="./js/keyring-unlock.js"></script>
 <script src="./js/config.js"></script>
 <script src="./js/store.js"></script>
 <script src="./js/api.js"></script>

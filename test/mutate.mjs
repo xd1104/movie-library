@@ -142,6 +142,54 @@ const M = [
 `, ``],
   ["V09 pttRepaint 不檢查 curId（層 B 備援，設計上觸發不到，預期全綠）", "js/app.js", `    pttRepaint = function () {
       if (curId !== id) return;`, `    pttRepaint = function () {`],
+  /* ---- 白名單「被改壞」而不是「不見了」（QA 2026-08-23：這才是安全性程式碼真實的退化方式）----
+     驗證類的程式碼，突變要同時有 ①整段移除 ②錨定符號拿掉 ③跳脫字元拿掉 ④條件放寬一格。 */
+  ["W6 PTT_URL_RE 少了開頭錨定 ^", "scripts/ptt-parse.mjs", `export const PTT_URL_RE = /^https:\\/\\/(?:www\\.)?ptt\\.cc\\//;`, `export const PTT_URL_RE = /https:\\/\\/(?:www\\.)?ptt\\.cc\\//;`],
+  ["W7 PTT_URL_RE 放寬到允許 http", "scripts/ptt-parse.mjs", `export const PTT_URL_RE = /^https:\\/\\/(?:www\\.)?ptt\\.cc\\//;`, `export const PTT_URL_RE = /^https?:\\/\\/(?:www\\.)?ptt\\.cc\\//;`],
+  ["W8 PTTOK 少了開頭錨定 ^（唯一真的可利用的）", "js/ui.js", `  var PTTOK = /^https:\\/\\/(?:www\\.)?ptt\\.cc\\//;`, `  var PTTOK = /https:\\/\\/(?:www\\.)?ptt\\.cc\\//;`],
+  ["W9 PTTOK 的點號沒跳脫", "js/ui.js", `  var PTTOK = /^https:\\/\\/(?:www\\.)?ptt\\.cc\\//;`, `  var PTTOK = /^https:\\/\\/(?:www\\.)?ptt.cc\\//;`],
+  ["W10 buildPayload 先建立條目再檢查（留下 0/0/0 空殼）", "scripts/ptt-parse.mjs", `  for (const e of entries || []) {
+    const slot = TAGS[e.tag];`, `  for (const e of entries || []) {
+    movies[String(e.movieId)] = movies[String(e.movieId)] || { good: 0, ok: 0, bad: 0, posts: [] };
+    const slot = TAGS[e.tag];`],
+  /* ---- 鑰匙圈（跨 App 身分）的接法 ---- */
+  ["K01 tokenKey 直接指到金鑰 key（OMDb 永遠進不來、換人會清掉手貼的）", "js/config.js", `  krBlobKey: "hlm_keyring_blob",`, `  krBlobKey: "hlm_key_tmdb",`],
+  ["K02 blob 沒有 tmdb 也照收", "js/api.js", `    if (!t) throw err("keyringbad", "keyring", "裡面沒有 tmdb 這一項");`, `    if (!t) return { tmdb: t, omdb: m };`],
+  ["K03 blob 不是 JSON 物件也照收", "js/api.js", `    if (!o || typeof o !== "object" || Array.isArray(o)) throw err("keyringbad", "keyring", "不是一個 JSON 物件");
+`, ``],
+  ["K04 鑰匙圈鎖回去時連手貼的金鑰一起清掉", "js/store.js", `    if (get("hlm_keys_src", "") !== "keyring") return false;
+`, ``],
+  ["K05 沒勾「記住這台裝置」也寫進 localStorage（金鑰留在別人的電腦上）", "js/store.js", `      del("hlm_key_tmdb"); del("hlm_key_omdb");
+      ssSet("hlm_key_tmdb", t); ssSet("hlm_key_omdb", o);`, `      ssDel("hlm_key_tmdb"); ssDel("hlm_key_omdb");
+      set("hlm_key_tmdb", t); set("hlm_key_omdb", o);`],
+  ["K06 鑰匙圈排在 boot() 之後（自我體檢會誤判成還沒設定）", "js/app.js", `  try { setupKeyring(); } catch (e) { }
+  boot();`, `  boot();
+  try { setupKeyring(); } catch (e) { }`],
+  ["K07 setupKeyring 沒有 try/catch（模組丟例外就整支停掉）", "js/app.js", `  try { setupKeyring(); } catch (e) { }
+  boot();`, `  setupKeyring();
+  boot();`],
+  ["K08 首頁不呼叫 maybeIntro", "js/app.js", `    if (krOn()) krTry(function () { Keyring.maybeIntro(); });
+`, ``],
+  ["K10 index.html 沒載入鑰匙圈模組", "index.html", `<script src="./js/keyring-unlock.js"></script>
+`, ``],
+  ["K11 鑰匙圈模組沒進 sw.js 殼快取", "sw.js", `  "./js/keyring-unlock.js",
+`, ``],
+  /* ---- 模組存取點的守衛（QA 2026-08-23 退件 K-1：包 try/catch ≠ 包對地方）---- */
+  ["G1 krOn() 沒有守衛（讀 window.Keyring 就爆時整支停掉）", "js/app.js", `    return krTry(function () { return !!(window.Keyring && typeof window.Keyring.init === "function"); }, false);`, `    return !!(window.Keyring && typeof window.Keyring.init === "function");`],
+  ["G2 isUnlocked() 沒有守衛（K-1 本尊：設定頁畫不出來）", "js/app.js", `    k.krUnlocked = krOn() && krTry(function () { return !!Keyring.isUnlocked(); }, false);`, `    k.krUnlocked = krOn() && Keyring.isUnlocked();`],
+  ["G3 chipHtml() 沒有守衛", "js/app.js", `      if (el) el.innerHTML = krTry(function () { return String(Keyring.chipHtml() || ""); }, "");`, `      if (el) el.innerHTML = Keyring.chipHtml();`],
+  ["G4 maybeIntro() 沒有守衛", "js/app.js", `    if (krOn()) krTry(function () { Keyring.maybeIntro(); });`, `    if (krOn()) Keyring.maybeIntro();`],
+  /* ---- 兩種金鑰來源交錯 ---- */
+  ["N10 手貼時沒把來源記號改回來（下次收回會清掉他手貼的）", "js/store.js", `    del("hlm_keys_src");                       /* 手貼的就不算是鑰匙圈給的 */
+`, ``],
+  ["N13 不記住時沒清掉 localStorage 的舊副本", "js/store.js", `      del("hlm_key_tmdb"); del("hlm_key_omdb");
+      ssSet("hlm_key_tmdb", t); ssSet("hlm_key_omdb", o);`, `      ssSet("hlm_key_tmdb", t); ssSet("hlm_key_omdb", o);`],
+  ["N14 keys() 改成 localStorage 優先（舊金鑰蓋過這次 session 的）", "js/store.js", `      tmdb: String(ssGet("hlm_key_tmdb") || get("hlm_key_tmdb", "") || "").trim(),
+      omdb: String(ssGet("hlm_key_omdb") || get("hlm_key_omdb", "") || "").trim()`, `      tmdb: String(get("hlm_key_tmdb", "") || ssGet("hlm_key_tmdb") || "").trim(),
+      omdb: String(get("hlm_key_omdb", "") || ssGet("hlm_key_omdb") || "").trim()`],
+  ["N15 手貼時沒清掉 session 的舊副本（新金鑰被舊的蓋住）", "js/store.js", `    ssDel("hlm_key_tmdb"); ssDel("hlm_key_omdb");
+    set("hlm_key_tmdb", String(t || "").trim());`, `    set("hlm_key_tmdb", String(t || "").trim());`],
+  ["N31 有鑰匙圈時「儲存並測試」鈕消失（手貼那條路斷掉）", "js/ui.js", `      '<button class="btn pri wide" type="button" id="saveTest">儲存並測試連線</button>' +`, `      (k.krOn ? "" : '<button class="btn pri wide" type="button" id="saveTest">儲存並測試連線</button>') +`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

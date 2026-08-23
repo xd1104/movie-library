@@ -3,7 +3,7 @@
    ⚠️ 這裡永遠不會有 API 金鑰。金鑰只存在使用者自己裝置的 localStorage。 */
 
 /* 唯一版本來源：改版就 +1，sw.js 的快取名稱會跟著換 */
-var HLM_VER = "1.1.0";
+var HLM_VER = "1.2.0";
 
 var HLM_CFG = {
   ver: HLM_VER,
@@ -43,6 +43,16 @@ var HLM_CFG = {
   /* 快取上限：超過就淘汰最舊的（localStorage 通常只有 5MB） */
   cacheMaxEntries: 400,
   cacheMaxChars: 1200000,
+
+  /* 鑰匙圈（跨 App 身分）：一組密碼解開他所有 App 的金鑰
+     ⚠️ appId 一律 ASCII（鑰匙圈的鐵律：中文 id 會在不同系統之間被正規化成兩筆），跟 repo 同名。
+     ⚠️ 鑰匙圈一個 App 只吃**一個** localStorage key，我們有 TMDB＋OMDb 兩把，
+        所以指到一個**專用的新 key**（存打包好的 JSON blob），解析後才寫進下面那兩把。
+        絕對不要把 tokenKey 直接指到 hlm_key_tmdb —— 那樣 OMDb 那把永遠進不來，
+        而且鑰匙圈「換人／被收回」時會把他手貼的金鑰一起清掉。 */
+  krAppId: "movie-library",
+  krAppName: "🎬 好雷嗎",
+  krBlobKey: "hlm_keyring_blob",
 
   /* 申請金鑰的網站 */
   urlTmdbKey: "https://www.themoviedb.org/settings/api",

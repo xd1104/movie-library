@@ -130,15 +130,68 @@ var HLM_Store = (function () {
   }
 
   /* ---------- 金鑰 ---------- */
+  /* ---------- sessionStorage（鑰匙圈「沒勾記住這台裝置」時用） ----------
+     鑰匙圈解鎖時如果沒勾「記住」，它把金鑰寫進 sessionStorage、關掉分頁就沒了（別人的電腦）。
+     我們從 blob 解出來的兩把金鑰**必須跟著同一個地方走**，
+     不然「借別人手機用一下」會把 TMDB／OMDb 金鑰永久留在那台裝置的 localStorage 裡。 */
+  function ssRaw(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function ssDel(k) { try { sessionStorage.removeItem(k); } catch (e) { } }
+  /* ⚠️ 跟 localStorage 那邊用**同一種編碼**（JSON）。
+     一邊存原文一邊存 JSON 的話，下一個人讀哪一邊都會踩到，而且不會報錯、只會拿到怪字串。 */
+  function ssGet(k) { try { var v = ssRaw(k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+
+  /* 原始字串（不 JSON.parse）。鑰匙圈寫進來的是一整串原文，
+     用 get() 讀會先被 JSON.parse 吃掉，貼錯格式時就拿不到原文來報錯了。 */
+  function rawGet(k) {
+    var v = ssRaw(k);
+    if (v != null) return v;
+    try { return lsOK ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch (e) { return null; }
+  }
+
   function keys() {
     return {
-      tmdb: String(get("hlm_key_tmdb", "") || "").trim(),
-      omdb: String(get("hlm_key_omdb", "") || "").trim()
+      tmdb: String(ssGet("hlm_key_tmdb") || get("hlm_key_tmdb", "") || "").trim(),
+      omdb: String(ssGet("hlm_key_omdb") || get("hlm_key_omdb", "") || "").trim()
     };
   }
+  /* 手貼（設定頁）→ 存這台裝置的 localStorage，行為跟以前一樣 */
   function saveKeys(t, o) {
+    ssDel("hlm_key_tmdb"); ssDel("hlm_key_omdb");
     set("hlm_key_tmdb", String(t || "").trim());
     set("hlm_key_omdb", String(o || "").trim());
+    del("hlm_keys_src");                       /* 手貼的就不算是鑰匙圈給的 */
+  }
+  /* 鑰匙圈給的 → remember 決定存哪裡，並記下來源（鑰匙圈鎖回去時要清掉，手貼的不能清） */
+  function saveKeysFromKeyring(t, o, remember) {
+    t = String(t || "").trim(); o = String(o || "").trim();
+    if (remember) {
+      ssDel("hlm_key_tmdb"); ssDel("hlm_key_omdb");
+      set("hlm_key_tmdb", t); set("hlm_key_omdb", o);
+    } else {
+      del("hlm_key_tmdb"); del("hlm_key_omdb");
+      ssSet("hlm_key_tmdb", t); ssSet("hlm_key_omdb", o);
+    }
+    set("hlm_keys_src", "keyring");
+  }
+  /* 鑰匙圈換人／被收回／換密碼 → 只清「鑰匙圈給的」，他自己手貼的要留著 */
+  function clearKeyringKeys() {
+    if (get("hlm_keys_src", "") !== "keyring") return false;
+    del("hlm_key_tmdb"); del("hlm_key_omdb");
+    ssDel("hlm_key_tmdb"); ssDel("hlm_key_omdb");
+    del("hlm_keys_src");
+    return true;
+  }
+  function keysFromKeyring() { return get("hlm_keys_src", "") === "keyring"; }
+
+  /* 鑰匙圈解出來的原始 blob：{raw, remember}；沒有就 null。
+     在 sessionStorage ＝ 沒勾「記住這台裝置」（跟模組的 writeToken 同一套規則）。 */
+  function keyringBlob() {
+    var k = HLM_CFG.krBlobKey;
+    var s2 = ssRaw(k);
+    if (s2 != null && String(s2).length) return { raw: s2, remember: false };
+    var l = rawGet(k);
+    return (l != null && String(l).length) ? { raw: l, remember: true } : null;
   }
 
   return {
@@ -146,6 +199,8 @@ var HLM_Store = (function () {
     get: get, set: set, del: del,
     cacheGet: cacheGet, cacheSet: cacheSet, cacheDel: cacheDel,
     cacheClear: cacheClear, cacheStats: cacheStats, sweep: sweep,
-    keys: keys, saveKeys: saveKeys
+    keys: keys, saveKeys: saveKeys,
+    rawGet: rawGet, keyringBlob: keyringBlob, saveKeysFromKeyring: saveKeysFromKeyring,
+    clearKeyringKeys: clearKeyringKeys, keysFromKeyring: keysFromKeyring
   };
 })();
