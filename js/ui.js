@@ -241,6 +241,170 @@ var HLM_UI = (function () {
   }
 
   /* ready=false → OMDb 還沒回來，只有 TMDB 的部分先畫（不可以改成等齊才顯示） */
+  /* ================= PTT 鄉民風向 =================
+     設計主張（lab-ux §9，老闆看過 demo 確認）：
+     **不給 PTT 一個分數**——不換算 0～100、不進綜合分數環，只給比例條＋票數＋一句結論詞。
+     上面四個是網站給的分數，這一塊是真人一票一票投的，兩者不該長得像。 */
+  var PTTCLS = { "好雷": "g", "普雷": "o", "負雷": "b" };
+  var PTTCOL = { g: "#41d18a", o: "#ffb020", b: "#ff5f6b" };
+
+  /* 結論詞：純比例，照規格 §9.4 抄，不要自己調門檻 */
+  function pttVerdict(g, o, b) {
+    var n = g + o + b, gr = g / n, br = b / n;
+    if (gr >= 0.80) return { w: "幾乎全是好雷", c: PTTCOL.g, split: false };
+    if (br >= 0.50) return { w: "負雷居多", c: PTTCOL.b, split: false };
+    if (gr >= 0.60 && br <= 0.25) return { w: "好雷佔多數", c: PTTCOL.g, split: false };
+    if (gr >= 0.35 && br >= 0.30) return { w: "評價兩極", c: PTTCOL.o, split: true };
+    if (br >= 0.30) return { w: "偏向負雷", c: PTTCOL.b, split: false };
+    return { w: "風向普通", c: PTTCOL.o, split: false };
+  }
+
+  /* 比例條寬度：非零段至少 4%（不然看不到），三段算完再正規化回 100% */
+  function pttSegs(g, o, b) {
+    var n = g + o + b;
+    var a = [g, o, b].map(function (v) { return v ? Math.max(4, v / n * 100) : 0; });
+    var t = a[0] + a[1] + a[2];
+    return a.map(function (v) { return v / t * 100; });
+  }
+
+  /* 預設顯示 5 則＝推文前 4 則 ＋「保底異見」1 則。
+     ⚠️ 這是刻意的，不是排序 bug：posts 已依推文數排好，一面倒的片會讓少數派永遠被擠掉，
+        但「有沒有人覺得雷」正是這個 App 的名字在問的事。**不要改成純推文排序。** */
+  function pttPicks(posts) {
+    if (posts.length <= 5) return posts.slice();
+    var top = posts.slice(0, 4), rest = posts.slice(4), i;
+    var hasBad = false, hasGood = false;
+    for (i = 0; i < top.length; i++) {
+      if (top[i].tag === "負雷") hasBad = true;
+      if (top[i].tag === "好雷") hasGood = true;
+    }
+    var want = !hasBad ? "負雷" : (!hasGood ? "好雷" : null);
+    var pick = null;
+    if (want) for (i = 0; i < rest.length; i++) if (rest[i].tag === want) { pick = rest[i]; break; }
+    if (!pick) pick = rest[0];
+    return top.concat([pick]);
+  }
+
+  /* 標題前面的 [好雷] 剝掉（左邊已經有色標籤了）；剝不掉就原樣顯示，不要整則丟掉 */
+  function pttTitle(t) {
+    return String(t == null ? "" : t).replace(/^\s*[\[［]\s*(好雷|普雷|負雷|雷|有雷|無雷)\s*[\]］]\s*/, "");
+  }
+
+  /* 「更新於 今天 HH:mm」／「更新於 8/20 14:30」；用 JSON 的 updated，不是抓取時間 */
+  function pttStamp(updated) {
+    var t = Date.parse(updated || "");
+    if (!t) return "";
+    var d = new Date(t), now = new Date(), p = function (x) { return String(x).padStart(2, "0"); };
+    var sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    return "更新於 " + (sameDay ? "今天" : (d.getMonth() + 1) + "/" + d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  /* 資料幾天沒更新（用 updated 算）；算不出來回 null */
+  function pttStaleDays(updated) {
+    var t = Date.parse(updated || "");
+    if (!t) return null;
+    return Math.floor((Date.now() - t) / 86400000);
+  }
+
+  var PTTARROW = '<svg class="pttarrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>';
+
+  /* ⭐ 網址白名單：只有 https://(www.)ptt.cc/... 才輸出 <a>。
+     esc() 只擋得住「把屬性撐破」，**擋不住 scheme**——
+     資料檔如果被污染（或哪天爬蟲被騙），javascript: 會在本站 origin 上執行，
+     data: 與外站網址則變成釣魚跳板。認不得的網址就退成純文字列：
+     標題照樣看得到，只是不能點。**不要為了「總是可以點」把這條拿掉。** */
+  var PTTOK = /^https:\/\/(?:www\.)?ptt\.cc\//;
+
+  function pttPostHTML(t) {
+    var cls = PTTCLS[t.tag] || "o";       /* 認不得的 tag 一律當普雷樣式，不要漏顯示、不要壞掉 */
+    var tag = PTTCLS[t.tag] ? t.tag : "普雷";
+    var inner = '<span class="ptttag ' + cls + '">' + esc(tag) + "</span>" +
+      '<span class="pttbody"><span class="pttt">' + esc(pttTitle(t.title)) + "</span>" +
+      '<span class="pttmeta">推 ' + (Number(t.push) || 0) + " · " + esc(t.date || "") + "</span></span>";
+    if (!PTTOK.test(String(t.url || ""))) return '<span class="pttpost nolink">' + inner + "</span>";
+    /* 外連：PTT 文章連結是「繼續讀評價」，不是導購（界線見 CLAUDE.md／規格 §9.7） */
+    return '<a class="pttpost" href="' + esc(t.url) + '" target="_blank" rel="noopener noreferrer">' +
+      inner + PTTARROW + "</a>";
+  }
+
+  /**
+   * PTT 卡片的內容（不含外面那層 .card）。
+   * p = { loading, err, data(整份 JSON), open }
+   * 五種狀態都在這裡：量夠／量太少／沒討論／過期／讀取失敗（規格 §9.6）
+   */
+  function pttHTML(id, p) {
+    p = p || {};
+    var head = function (stamp, stale) {
+      return '<div class="ptthead"><p class="sec-title">PTT 鄉民風向</p>' +
+        (stamp ? '<span class="pttstamp' + (stale ? " stale" : "") + '">' + esc(stamp) + "</span>" : "") + "</div>";
+    };
+
+    if (p.loading) {
+      return head("") +
+        '<div class="skel" style="height:12px;border-radius:999px;margin-bottom:14px;"></div>' +
+        '<div class="skel" style="height:14px;width:70%;margin-bottom:10px;"></div>' +
+        '<div class="skel" style="height:14px;width:52%;"></div>';
+    }
+
+    /* 狀態 5b：讀不到整份資料。⚠️ 一定要跟「沒有討論」長得不一樣——
+       混在一起會讓人以為冷門片壞掉，或以為爬蟲掛了只是沒人討論。 */
+    if (p.err) {
+      return head("讀不到") +
+        '<div class="ptterr"><p>PTT 討論資料暫時讀不到。<br>可能是網路不穩，或資料檔正在更新。</p>' +
+        '<button type="button" id="pttretry">重試</button></div>';
+    }
+
+    var data = p.data || {};
+    var days = pttStaleDays(data.updated);
+    var stale = days !== null && days >= C.pttStaleDays;
+    var H = head(pttStamp(data.updated), stale);
+
+    var d = HLM_Api.pttFor(data, id);
+    /* 狀態 3：完全沒有討論（多數片都是這個狀態，所以壓成一行灰字，不用大圖示空狀態） */
+    if (!d || (d.good + d.ok + d.bad) === 0) {
+      return H + '<div class="pttnone"><span class="qm">?</span><span>' +
+        "PTT 電影板查不到這部片的雷文。<br>老片、冷門片或非院線片通常都不會有。</span></div>";
+    }
+
+    var g = d.good, o = d.ok, b = d.bad, n = g + o + b;
+    var shown = p.open ? d.posts : pttPicks(d.posts);
+    var list = d.posts.length ? '<div class="pttlist">' + shown.map(pttPostHTML).join("") + "</div>" : "";
+    var more = d.posts.length > shown.length
+      ? '<button class="morebtn" type="button" id="pttmore">展開全部 ' + d.posts.length + " 則</button>"
+      : (p.open && d.posts.length > 5 ? '<button class="morebtn" type="button" id="pttmore">收合</button>' : "");
+    var staleWarn = stale
+      ? '<p class="pttwarn">PTT 資料已經 ' + days + " 天沒更新，可能漏掉最新的討論。</p>" : "";
+    /* 一行處理三件事：資料性質、爆雷告知、會離開 App。不要拆成三個提示框。 */
+    var foot = '<p class="pttfoot">共 ' + n + " 篇 PTT 電影板心得。好雷／普雷／負雷是鄉民自己在標題標的，" +
+      "不是評分網站的分數。標題由發文者自訂、可能含劇情，點了會用瀏覽器開啟 PTT。</p>";
+
+    /* 狀態 2：1～3 篇。刻意不畫比例條也不給結論詞——3 篇算出「67% 好雷」是說謊 */
+    if (n <= 3) {
+      return H + '<p class="pttwarn">PTT 上只有 ' + n + " 篇心得，還看不出風向，看看就好。</p>" +
+        list + more + staleWarn + foot;
+    }
+
+    var v = pttVerdict(g, o, b), sg = pttSegs(g, o, b);
+    var bar = '<div class="pttbar">' +
+      (g ? '<i style="width:' + sg[0].toFixed(2) + "%;background:" + PTTCOL.g + '"></i>' : "") +
+      (o ? '<i style="width:' + sg[1].toFixed(2) + "%;background:" + PTTCOL.o + '"></i>' : "") +
+      (b ? '<i style="width:' + sg[2].toFixed(2) + "%;background:" + PTTCOL.b + '"></i>' : "") + "</div>";
+    var legend = '<div class="pttlegend">' +
+      '<span><i class="dot" style="background:' + PTTCOL.g + '"></i>好雷 <b>' + g + "</b></span>" +
+      '<span><i class="dot" style="background:' + PTTCOL.o + '"></i>普雷 <b>' + o + "</b></span>" +
+      '<span><i class="dot" style="background:' + PTTCOL.b + '"></i>負雷 <b>' + b + "</b></span></div>";
+    /* 只有「評價兩極」才給提示框；一面倒不給（結論詞已經講完了，同一頁不該有兩個琥珀框） */
+    var split = v.split
+      ? '<div class="divergent"><span class="warnmark">!</span><span>鄉民吵很兇：' + g + " 篇好雷、" + b +
+        " 篇負雷咬得很緊。這種片體質偏兩極，很可能不是「好不好看」而是「合不合你胃口」。</span></div>" : "";
+
+    return H +
+      '<div class="pttsum"><div class="pttword" style="color:' + v.c + '">' + v.w + "</div>" +
+      '<div class="pttrate">好雷率 <b style="color:' + v.c + '">' + Math.round(g / n * 100) + "%</b></div></div>" +
+      bar + legend + split + list + more + staleWarn + foot;
+  }
+
   function detailHTML(m, ctx) {
     var sc = ctx.scores, ready = ctx.ready, agg = ready ? aggregate(m, sc) : null, ringHTML;
 
@@ -323,6 +487,10 @@ var HLM_UI = (function () {
       (m.tmdb != null && m.votes < 50 ? '<p class="hintline" style="margin:12px 0 0">TMDB 只有 ' + m.votes + " 人評分，這個分數參考價值有限。</p>" : "") +
       scoreNote +
       "</div>" +
+
+      /* PTT 插在四個分數與平台之間：兩者都在回答「值不值得看」，必須相鄰；
+         平台回答的是「我打不打得開」，要留在後面（規格 §9.1） */
+      '<div class="card block" id="pttcard">' + pttHTML(m.id, ctx.ptt) + "</div>" +
 
       '<div class="card block"><p class="sec-title">台灣哪裡看得到</p>' + watchSection(m, pv, ctx.pvLoading) + "</div>" +
 
@@ -421,6 +589,8 @@ var HLM_UI = (function () {
     dotsHTML: dotsHTML, rowHTML: rowHTML, metaHTML: metaHTML, skeletonRows: skeletonRows,
     emptyPf: emptyPf, emptySearch: emptySearch, emptyList: emptyList, errorBox: errorBox,
     detailHTML: detailHTML, detailSkeleton: detailSkeleton,
+    pttHTML: pttHTML, pttVerdict: pttVerdict, pttSegs: pttSegs, pttPicks: pttPicks,
+    pttTitle: pttTitle, pttStamp: pttStamp, pttStaleDays: pttStaleDays,
     setupHTML: setupHTML, testRow: testRow, mysubsChips: mysubsChips,
     fmtDateLong: fmtDateLong, fmtMD: fmtMD, daysSinceRelease: daysSinceRelease
   };

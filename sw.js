@@ -1,4 +1,4 @@
-/* build 1.0.2 */
+/* build 1.1.0 */
 /* ⚠️ 上面那行 build 版本字串要跟 js/config.js 的 HLM_VER 一起 +1。
    兩個地方都要改是刻意的：瀏覽器判斷「SW 有沒有更新」是比對 sw.js 本身的位元組，
    只改 importScripts 進來的 config.js 有機會不觸發更新，那個症狀是「老闆永遠拿不到新版」。 */
@@ -87,6 +87,12 @@ self.addEventListener("fetch", function (e) {
   }
 
   if (url.origin !== self.location.origin) return;
+
+  /* PTT 資料：**不進殼快取**、也不 cache-first。
+     殼快取的名字綁著 HLM_VER，這個檔一天更新一次，進去就會被凍到下次改版才更新
+     （症狀：老闆看到的永遠是舊風向，而且沒有人會發現）。
+     直接放行走網路；離線時的退路是 localStorage 的離線副本（api.js 的 ptt()）。 */
+  if (/\/data\/ptt-movie\.json$/.test(url.pathname)) return;
 
   /* App 殼：cache-first，沒有才上網 */
   e.respondWith(

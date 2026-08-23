@@ -78,10 +78,7 @@ const M = [
   ["T01 Re: 回文也算進票數", "scripts/ptt-parse.mjs", `  if (/^re\\s*[:：]/i.test(t)) return "reply";`, `  if (false) return "reply";`],
   ["T02 置底板規文也算進去", "scripts/ptt-parse.mjs", `    if (starts[i] > sepAt) { skipped.pinned++; continue; }   /* 置底文不收 */`, `    if (false) { skipped.pinned++; continue; }`],
   ["T03 標題不框在 div.title 裡（會抓到下拉選單的連結）", "scripts/ptt-parse.mjs", `    const link = SELECTORS.titleLink.exec(tb[1]);`, `    const link = SELECTORS.titleLink.exec(chunk);`],
-  ["T04 片名歧義時先命中先贏（會錯配）", "scripts/ptt-parse.mjs", `  if (hits.length > 1 && hits[1].score === hits[0].score && hits[1].id !== hits[0].id) {
-    return { id: null, reason: "ambiguous" };
-  }
-`, ``],
+  ["T04 破平也分不出來時還是硬配一部（會錯配）", "scripts/ptt-parse.mjs", `  if (!how) return { id: null, reason: "ambiguous" };`, `  if (false) return { id: null, reason: "ambiguous" };`],
   ["T05 短片名不管出現在哪裡都算", "scripts/ptt-parse.mjs", `        ok = pos >= 0 && (a.tight.length > MATCH.SHORT_CJK_MAX || pos <= MATCH.HEAD_CHARS);`, `        ok = pos >= 0;`],
   ["T06 每部片不截斷成 8 則", "scripts/ptt-parse.mjs", `    m.posts = m.posts.slice(0, MATCH.MAX_POSTS);
 `, ``],
@@ -96,6 +93,55 @@ const M = [
   ["T12 User-Agent 塞中文（每個請求都會炸）", "scripts/fetch-ptt.mjs", `  ua: "Mozilla/5.0 (compatible; hao-lei-ma-bot/1.0; personal use, once a day)",`, `  ua: "Mozilla/5.0 (compatible; hao-lei-ma-bot/1.0; 個人用途)",`],
   ["T13 翻頁不跟著「上頁」走（一直抓同一頁）", "scripts/fetch-ptt.mjs", `      url = parsed.prevUrl;`, `      url = url;`],
   ["T14 翻到三個月前也不停", "scripts/fetch-ptt.mjs", `      if (oldest && oldest < cutoffTime) { stopReason = "翻到 " + CFG.daysBack + " 天以前了"; break; }`, `      if (false) { stopReason = "翻到 " + CFG.daysBack + " 天以前了"; break; }`],
+  /* ---- PTT 鄉民風向（畫面）---- */
+  ["U01 PTT 資料進殼快取（會被凍到下次改版）", "sw.js", `  "./manifest.webmanifest",`, `  "./manifest.webmanifest",
+  "./data/ptt-movie.json",`],
+  ["U02 SW 不放行 PTT 資料（變成 cache-first）", "sw.js", `  if (/\\/data\\/ptt-movie\\.json$/.test(url.pathname)) return;
+`, ``],
+  ["U03 保底異見改成純推文排序", "js/ui.js", `    var want = !hasBad ? "負雷" : (!hasGood ? "好雷" : null);`, `    var want = null;`],
+  ["U04 讀取失敗當成「沒有討論」", "js/ui.js", `    if (p.err) {
+      return head("讀不到") +`, `    if (false) {
+      return head("讀不到") +`],
+  ["U05 過期門檻失效（永遠不標過期）", "js/ui.js", `    var stale = days !== null && days >= C.pttStaleDays;`, `    var stale = false;`],
+  ["U06 只有 1~3 篇也畫比例條", "js/ui.js", `    if (n <= 3) {`, `    if (false) {`],
+  ["U07 好雷率分母不含普雷", "js/ui.js", `'<div class="pttrate">好雷率 <b style="color:' + v.c + '">' + Math.round(g / n * 100) + "%</b></div></div>" +`, `'<div class="pttrate">好雷率 <b style="color:' + v.c + '">' + Math.round(g / (g + b) * 100) + "%</b></div></div>" +`],
+  ["U08 每點一部片就抓一次 PTT 資料", "js/api.js", `    if (pttMemo && !force) return pttMemo;`, `    if (false) return pttMemo;`],
+  ["U09 網路失敗時不吃離線副本", "js/api.js", `      if (c && c.v && c.v.movies) return { v: c.v, cached: true };
+`, ``],
+  ["U10 外連拿掉 rel=noopener", "js/ui.js", `    return '<a class="pttpost" href="' + esc(t.url) + '" target="_blank" rel="noopener noreferrer">' +`, `    return '<a class="pttpost" href="' + esc(t.url) + '" target="_blank">' +`],
+  ["U11 換一部片不重置展開狀態", "js/app.js", `    ptt.open = false;                     /* 切到別部片就收合（規格 §9.5） */
+`, ``],
+  ["U12 一面倒也跳「評價兩極」提示框", "js/ui.js", `    if (gr >= 0.80) return { w: "幾乎全是好雷", c: PTTCOL.g, split: false };`, `    if (gr >= 0.80) return { w: "幾乎全是好雷", c: PTTCOL.g, split: true };`],
+  ["U13 PTT 區塊掉到平台後面", "js/ui.js", `      '<div class="card block" id="pttcard">' + pttHTML(m.id, ctx.ptt) + "</div>" +
+
+      '<div class="card block"><p class="sec-title">台灣哪裡看得到</p>' + watchSection(m, pv, ctx.pvLoading) + "</div>" +`, `      '<div class="card block"><p class="sec-title">台灣哪裡看得到</p>' + watchSection(m, pv, ctx.pvLoading) + "</div>" +
+
+      '<div class="card block" id="pttcard">' + pttHTML(m.id, ctx.ptt) + "</div>" +`],
+  ["U14 同名破平規則失效（打平就全部放棄）", "scripts/ptt-parse.mjs", `  top.sort((x, y) => tieBreak(x.mv, y.mv));`, `  return { id: null, reason: "ambiguous" };`],
+  ["U15 破平不看「現正上映」", "scripts/ptt-parse.mjs", `  if (a.inCinema !== b.inCinema) return a.inCinema ? -1 : 1;
+`, ``],
+  ["U16 scanned 不分開記 ambiguous", "scripts/fetch-ptt.mjs", `        if (hit.reason === "ambiguous") {
+          stats.ambiguous++;`, `        if (false) {
+          stats.ambiguous++;`],
+  /* ---- PTT 文章網址白名單 / 外部輸入（2026-08-23 QA 退件 F-1 之後補的）---- */
+  ["V01 absUrl 放行外站絕對網址", "scripts/ptt-parse.mjs", `    const m = /^https?:\\/\\/(?:www\\.)?ptt\\.cc(\\/[^\\s]*)?$/i.exec(h);
+    return m ? PTT_ORIGIN + (m[1] || "/") : null;    /* 非 ptt.cc → 丟掉；http 順便升級成 https */`, `    return h;`],
+  ["V02 absUrl 放行 protocol-relative 與相對路徑", "scripts/ptt-parse.mjs", `  if (h.slice(0, 2) === "//") return null;           /* //evil.example.com/x 會沿用當前協定，等同外站 */
+  if (h[0] !== "/") return null;                     /* javascript: / data: / 相對路徑一律不收 */
+`, ``],
+  ["V03 列表頁不丟掉外站連結的文章", "scripts/ptt-parse.mjs", `    if (!url) { skipped.foreign = (skipped.foreign || 0) + 1; continue; }   /* 不是 ptt.cc 的連結 → 整篇丟掉 */
+`, ``],
+  ["V04 buildPayload 不擋非 ptt.cc 網址", "scripts/ptt-parse.mjs", `    if (!PTT_URL_RE.test(String(e.url || ""))) continue;
+`, ``],
+  ["V05 畫面不擋毒網址（javascript: 會被渲染成可點的 <a>）", "js/ui.js", `    if (!PTTOK.test(String(t.url || ""))) return '<span class="pttpost nolink">' + inner + "</span>";
+`, ``],
+  ["V06 文章標題不跳脫（XSS）", "js/ui.js", `      '<span class="pttbody"><span class="pttt">' + esc(pttTitle(t.title)) + "</span>" +`, `      '<span class="pttbody"><span class="pttt">' + pttTitle(t.title) + "</span>" +`],
+  ["V07 拿掉 PTT JSON 的格式檢查", "js/api.js", `      if (!j || typeof j !== "object" || !j.movies) throw err("server", "ptt", "JSON 格式不對");
+`, ``],
+  ["V08 清快取不清 PTT 離線副本", "js/store.js", `    del("hlm_ptt");
+`, ``],
+  ["V09 pttRepaint 不檢查 curId（層 B 備援，設計上觸發不到，預期全綠）", "js/app.js", `    pttRepaint = function () {
+      if (curId !== id) return;`, `    pttRepaint = function () {`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 
@@ -123,13 +169,18 @@ const ONLY = (ARGV.find(a => a.startsWith("--only=")) || "").replace("--only=", 
 const onlyList = ONLY ? ONLY.split(",").filter(Boolean) : null;
 const picked = M.filter(m => !onlyList || onlyList.some(o => m[0].indexOf(o) === 0));
 
-/* 「預期全綠」是刻意的，目前只有 2 條：
+/* 「預期全綠」是刻意的，目前只有 3 條：
      R1a  只拿掉 pfNames（層 B 的備援守衛）→ 層 A 會接住，看不出差別
+     V09  pttRepaint 的 curId 守衛 → pttRepaint 每次 openDetail 都會被覆寫成「最新那部片」的，
+          所以那條 if 永遠是 false，拿掉看不出差別。真正在守「舊片資料不會畫進新片的卡」
+          這件事的是設計本身（一律用當下的 pttRepaint），t12 §45 驗的就是那個行為。
+          留著這行是為了以後有人多加一個觸發重畫的地方時不會炸。
+          ⚠️ 哪天它會紅了 → 代表設計變了，工具會擋下來要求重新檢視，這是刻意的。
      對照組 無害改動
    數量寫死在這裡，多一條少一條都要有人重新想過——不可以靠改名字把礙事的突變混進豁免。
    （R1c「只拿掉層 A」本來也在豁免名單裡，2026-08-23 補了 P03 測試之後它會紅了，
      所以移出豁免。工具會自己抓到這種狀況並要求重新檢視，這是刻意的。） */
-const EXEMPT_COUNT = 2;
+const EXEMPT_COUNT = 3;
 const exemptDefined = M.filter(m => /預期全綠/.test(m[0]));
 
 function pairsOf(from, to) { return Array.isArray(from) ? from : [[from, to]]; }

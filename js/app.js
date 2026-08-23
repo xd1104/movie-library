@@ -257,6 +257,28 @@
     for (var c = 0; c < 3; c++) next();
   }
 
+  /* ---------- PTT 鄉民風向 ----------
+     整份 JSON 一次抓、一個 session 只抓一次（Api.ptt 自己記住結果）。
+     這裡只放「畫面現在該顯示哪一種狀態」，資料與快取邏輯在 api.js。 */
+  var ptt = { loading: false, data: null, err: null, open: false };
+  var pttRepaint = null;      /* 由 openDetail 設定：只重畫 PTT 那張卡，不要重畫整頁
+                                 （重畫整頁會把他展開的劇情簡介收回去） */
+
+  function loadPtt(force) {
+    if (ptt.loading) return;
+    if (ptt.data && !force) return;
+    ptt.loading = true; ptt.err = null;
+    if (pttRepaint) pttRepaint();
+    Api.ptt(force).then(function (r) {
+      ptt.loading = false; ptt.data = r.v; ptt.err = null;
+      if (pttRepaint) pttRepaint();
+    }).catch(function (e) {
+      /* 讀不到 ≠ 沒有討論。這裡一定要留下 err，畫面才會走「讀取失敗＋重試」而不是空狀態 */
+      ptt.loading = false; ptt.err = e;
+      if (pttRepaint) pttRepaint();
+    });
+  }
+
   /* ---------- 詳細頁 ---------- */
   function backLabel() {
     if (state.query) return "回搜尋結果";
@@ -280,8 +302,22 @@
          舊的 m: 可能已經被 sweep() 淘汰掉，那樣就永遠清不到 o:。 */
     }
 
-    var ctx = { ready: false, pvLoading: true, scores: null, pv: null, backLabel: backLabel(), ovOpen: false };
+    ptt.open = false;                     /* 切到別部片就收合（規格 §9.5） */
+    var ctx = { ready: false, pvLoading: true, scores: null, pv: null, backLabel: backLabel(), ovOpen: false, ptt: ptt };
     var mv = null, stamps = [];
+
+    /* 只重畫 PTT 那張卡（重畫整頁會把他展開的劇情簡介收回去）。
+       ⚠️ 層 B 的備援守衛：pttRepaint 每次 openDetail 都會被覆寫成「最新那部片」的，
+       所以 curId !== id 目前**觸發不到**（跟 CLAUDE.md 第 16 條的 pfNames 同一種東西）。
+       留著是為了以後有人改成「不只一個地方會觸發重畫」時，
+       不會把上一部片的 PTT 資料畫進新片的卡。真正在守這件事的是
+       「一律用當下的 pttRepaint」這個設計本身，t12 §45 驗的是那個行為。 */
+    pttRepaint = function () {
+      if (curId !== id) return;
+      var el = $("pttcard");
+      if (el) el.innerHTML = UI.pttHTML(id, ptt);
+    };
+    loadPtt(false);
 
     function paint() {
       if (curId !== id) return;
@@ -579,6 +615,15 @@
       S.cacheClear();
       renderSetup(!hasTmdbKey());
       toast("快取已清空");
+      return;
+    }
+    if (t.closest("#pttmore")) {
+      ptt.open = !ptt.open;
+      if (pttRepaint) pttRepaint();
+      return;
+    }
+    if (t.closest("#pttretry")) {
+      loadPtt(true);
       return;
     }
     if ((el = t.closest("#ovbtn"))) {

@@ -116,6 +116,9 @@ var HLM_Store = (function () {
   function cacheClear() {
     var keys = cacheKeys();
     for (var i = 0; i < keys.length; i++) del(keys[i]);
+    /* PTT 的離線副本不在 hlm_c: 命名空間（它不走 TTL／淘汰那一套），
+       但按鈕上寫的是「清掉暫存資料」——不一起清掉，語意就是騙人的。 */
+    del("hlm_ptt");
   }
 
   function cacheStats() {

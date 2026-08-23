@@ -3,10 +3,11 @@
 看 Netflix 或去電影院之前，**一頁看完一部片值不值得看**。
 
 - 電影院現在上映什麼、你訂的串流平台上有什麼，兩個分頁分開看
-- 點進一部片：TMDB／IMDb／爛番茄／Metacritic 四個分數 + 綜合評價 + 台灣哪裡看得到
+- 點進一部片：TMDB／IMDb／爛番茄／Metacritic 四個分數 + 綜合評價 + **PTT 鄉民風向** + 台灣哪裡看得到
 - 純靜態網頁、可加到 iPhone 主畫面（PWA）、離線也打得開殼
 
 > **這個 App 只查評價，不導購。** 沒有「去訂票」「去 Netflix 看」的按鈕，平台資訊只顯示、不可點。
+> （PTT 文章標題可以點過去看內文——那是「繼續讀評價」，不是導購。）
 
 ---
 
@@ -53,7 +54,7 @@ npm test
 ```
   ✓ t1-firstrun     26 過 /  0 失敗    第一次使用／設定金鑰
   ...
-  全部通過：共 492 個斷言，492 過 / 0 失敗，11 支測試檔
+  全部通過：共 652 個斷言，652 過 / 0 失敗，12 支測試檔
 ```
 
 ```bash
@@ -145,13 +146,23 @@ repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 node scripts/fetch-ptt.mjs --offline --out=/tmp/ptt.json
 ```
 
+### App 上長怎樣
+
+詳細頁的四個分數下面多一張「PTT 鄉民風向」卡：一句結論詞（幾乎全是好雷／評價兩極／負雷居多…）、
+好雷率、好／普／負的比例條與票數，再加 5 則文章標題（點了會用瀏覽器開 PTT）。
+
+- **不會把 PTT 換算成分數**，也不會算進綜合分數環——那是真人一票一票投的，跟評分網站不是同一種東西。
+- 少於 4 篇不畫比例條（3 篇算百分比是說謊），只列標題。
+- 沒有討論的片只有一行灰字；**讀不到資料**則是另一種畫面（有重試鈕），兩者刻意長得不一樣。
+- 資料超過 3 天沒更新會標成琥珀色並說「已經 N 天沒更新」。
+
 ### 檔案長相（`data/ptt-movie.json`）
 
 ```json
 {
   "updated": "2026-08-23T04:00:00Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
-  "scanned": { "pages": 20, "posts": 843, "matched": 412, "unmatched": 431 },
+  "scanned": { "pages": 40, "posts": 797, "tagged": 158, "matched": 104, "ambiguous": 2, "unmatched": 52 },
   "movies": {
     "693134": {
       "good": 12, "ok": 3, "bad": 1,
@@ -167,8 +178,9 @@ node scripts/fetch-ptt.mjs --offline --out=/tmp/ptt.json
 - key 是 **TMDB 電影 id**；`good`/`ok`/`bad` ＝ 好雷/普雷/負雷（**全部文章的數量**）
 - `posts` 依推文數由高到低，**每部片最多 8 則**（檔案會被使用者下載，不能無限長）
 - **沒有討論的片不會出現在 `movies` 裡**（App 顯示「PTT 上沒找到討論」）
-- `scanned` 是健康度：`pages` 抓了幾頁、`posts` 掃到幾篇（含非雷文）、
-  `matched`/`unmatched` 是**雷文**裡比對到片／沒比對到的篇數（比對率＝ matched ÷ (matched+unmatched)）
+- `scanned` 是健康度：`pages` 抓了幾頁、`posts` 掃到幾篇（**含非雷文**）、`tagged` 雷文幾篇、
+  `matched` 比對到片、`ambiguous` 同名破平也分不出來而放棄、`unmatched` 根本沒命中。
+  **`tagged = matched + ambiguous + unmatched`**，比對率＝ `matched ÷ tagged`
 
 ### 出事的時候看哪裡
 

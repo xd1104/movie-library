@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<!-- 測試用假 PTT 列表頁 C：**毒測資**。
+     驗「只允許 ptt.cc」這件事——沒有這種一筆「不是 X」的測資，
+     那條斷言驗的是 fixture 不是程式（2026-08-23 QA 退件的原因）。 -->
+<html><head><title>看板 movie 文章列表 - 批踢踢實業坊</title></head><body>
+<div id="main-container">
+<div class="r-list-container action-bar-margin bbs-screen">
+
+<div class="r-ent">
+<div class="nrec"><span class="hl f1">99</span></div>
+<div class="title">
+	<a href="https://evil.example.com/phish">[好雷] 沙丘2 這篇的連結指向外站</a>
+</div>
+<div class="meta"><div class="author">attacker</div><div class="date"> 8/21</div></div>
+</div>
+
+<div class="r-ent">
+<div class="nrec"><span class="hl f1">98</span></div>
+<div class="title">
+	<a href="//evil.example.com/x">[好雷] 沙丘2 protocol-relative 連結</a>
+</div>
+<div class="meta"><div class="author">attacker</div><div class="date"> 8/21</div></div>
+</div>
+
+<div class="r-ent">
+<div class="nrec"><span class="hl f1">97</span></div>
+<div class="title">
+	<a href="javascript:window.__pwn=1">[好雷] 沙丘2 javascript 連結</a>
+</div>
+<div class="meta"><div class="author">attacker</div><div class="date"> 8/21</div></div>
+</div>
+
+<div class="r-ent">
+<div class="nrec"><span class="hl f1">96</span></div>
+<div class="title">
+	<a href="http://ptt.cc/bbs/movie/M.1787184001.A.C01.html">[好雷] 腦筋急轉彎2 站內絕對網址要收下並升級成 https</a>
+</div>
+<div class="meta"><div class="author">normaluser</div><div class="date"> 8/21</div></div>
+</div>
+
+<div class="r-ent">
+<div class="nrec"><span class="hl f1">95</span></div>
+<div class="title">
+	<a href="/bbs/movie/M.1787184002.A.C02.html">[好雷] 腦筋急轉彎2 &lt;img src=x onerror=window.__xss=1&gt; "&amp;" 標題帶標籤</a>
+</div>
+<div class="meta"><div class="author">normaluser</div><div class="date"> 8/21</div></div>
+</div>
+
+</div>
+<div class="btn-group btn-group-paging">
+<a class="btn wide" href="/bbs/movie/index3940.html">&lsaquo; 上頁</a>
+</div>
+</div>
+</body></html>

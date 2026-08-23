@@ -81,8 +81,16 @@ section("23. 只查評價、不導購");
   const ui = read("js/ui.js");
   const uiLinks = ui.match(/<a [\s\S]{0,80}?href="' \+ (C\.\w+)/g) || [];
   const anchors = (ui.match(/<a /g) || []).length;
-  ok(anchors === 2 && uiLinks.length === 2, "全 App 只有 2 個 <a>（" + anchors + "）");
+  /* 2026-08-23：PTT 文章連結是老闆指定要的功能，**不在「不導購」禁令裡**（規格 §9.7）。
+     界線：出去之後是「繼續讀評價」＝可以；出去之後是「掏錢／播放」＝禁止。
+     所以這裡不再只數數量，而是逐一確認每個 <a> 是哪一種。 */
+  ok(anchors === 3 && uiLinks.length === 2,
+    "全 App 只有 3 個 <a>：2 個申請金鑰 ＋ 1 個 PTT 文章（實際 " + anchors + "）");
   ok(/C\.urlTmdbKey/.test(uiLinks.join()) && /C\.urlOmdbKey/.test(uiLinks.join()), "而且只指向申請金鑰的 TMDB／OMDb 網址");
+  ok(/<a class="pttpost" href="' \+ esc\(t\.url\) \+ '" target="_blank" rel="noopener noreferrer"/.test(ui),
+    "★ PTT 外連：網址來自資料檔、target=_blank、rel=noopener noreferrer");
+  ok(!/href="https?:\/\/(www\.)?(netflix|disneyplus|primevideo|catchplay|friday|myvideo|apple|google|kktix|books)/i.test(ui),
+    "★ 沒有任何平台／訂票網站的外連");
   ok(/urlTmdbKey: "https:\/\/www\.themoviedb\.org/.test(read("js/config.js")) && /urlOmdbKey: "https:\/\/www\.omdbapi\.com/.test(read("js/config.js")), "網址正確");
   ok(/class="pv"/.test(read("js/ui.js")) && !/<button class="pv/.test(read("js/ui.js")), "平台是 span 不是 button");
   ok(/\.pv\{[^}]*cursor:default/.test(read("css/app.css")), "平台標籤 cursor:default");

@@ -78,7 +78,10 @@ section("10. 平台是純標籤、沒有任何外連");
   await openRow(w, d, 0, 150);
   const h = html(d, "dbody");
   ok(/class="pv"/.test(h), "有平台標籤");
-  ok(!/<a /.test(h), "★ 詳細頁沒有任何 <a> 外連");
+  /* 詳細頁唯一允許的外連是 PTT 文章（規格 §9.7）；平台仍然一個連結都不可以有 */
+  const anchors3 = h.match(/<a [^>]*>/g) || [];
+  ok(anchors3.every(a => /class="pttpost"/.test(a)),
+    "★ 詳細頁的 <a> 只有 PTT 文章連結，沒有導購外連", anchors3.join(" | "));
   ok(!/<button[^>]*class="pv/.test(h) && !/data-pv/.test(h), "★ 平台不是按鈕、不可點");
   ok(!/訂票|查場次|前往|立即觀看|去 Netflix/.test(h), "★ 沒有任何導購字眼");
   ok(/訂閱可看/.test(h) && /租借/.test(h) && /購買/.test(h), "分組：訂閱 → 租借 → 購買");

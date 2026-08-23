@@ -85,6 +85,44 @@ var HLM_Api = (function () {
       });
   }
 
+  /* ---------- PTT 鄉民風向 ----------
+     同源靜態 JSON，一次抓整份、**一個 session 只抓一次**（不要每點一部片抓一次）。
+     ⚠️ network-first：拿得到網路就用網路的，拿不到才吃 localStorage 的離線副本。
+        （不可以反過來——這個檔一天更新一次，先吃快取會讓他看到昨天的風向。）
+     ⚠️ 「資料過不過期」是用 JSON 裡的 updated 判斷，不是用抓取時間：
+        爬蟲掛掉時 fetch 會成功、但 updated 是舊的，那正是要抓出來的狀況。 */
+  var pttMemo = null;      /* 這個 session 的結果（含失敗），避免每點一部片都打一次 */
+
+  function ptt(force) {
+    if (pttMemo && !force) return pttMemo;
+    pttMemo = fetchJSON(C.pttUrl, "ptt").then(function (j) {
+      if (!j || typeof j !== "object" || !j.movies) throw err("server", "ptt", "JSON 格式不對");
+      /* 存成跟快取層一樣的 {t, v} 形狀；t 只是給人除錯用（「這份副本什麼時候抓的」），
+         **程式沒有任何地方讀它**——資料新不新一律看 JSON 裡的 updated，不是抓取時間。 */
+      HLM_Store.set("hlm_ptt", { t: Date.now(), v: j });
+      return { v: j, cached: false };
+    }).catch(function (e) {
+      /* 網路失敗才吃離線副本。副本比 TTL 舊也照用——顯示出來的「更新於」是 JSON 自己的
+         updated，不會騙人；有東西看永遠比一片空白好。 */
+      var c = HLM_Store.get("hlm_ptt", null);
+      if (c && c.v && c.v.movies) return { v: c.v, cached: true };
+      pttMemo = null;          /* 沒有副本可用 → 讓「重試」鈕真的能重試 */
+      throw e;
+    });
+    return pttMemo;
+  }
+
+  /* 這部片的 PTT 資料；沒有討論就回 null（跟「讀不到」是兩件事，不可以混在一起） */
+  function pttFor(data, id) {
+    if (!data || !data.movies) return null;
+    var d = data.movies[String(id)];
+    if (!d || typeof d !== "object") return null;
+    return {
+      good: Number(d.good) || 0, ok: Number(d.ok) || 0, bad: Number(d.bad) || 0,
+      posts: Array.isArray(d.posts) ? d.posts.filter(function (p) { return p && p.url && p.title; }) : []
+    };
+  }
+
   /* ---------- 錯誤 → 人話 ---------- */
   function human(e) {
     var kind = (e && e.kind) || "unknown";
@@ -400,7 +438,7 @@ var HLM_Api = (function () {
   }
 
   return {
-    err: err, human: human,
+    err: err, human: human, ptt: ptt, pttFor: pttFor,
     syncProviderIds: syncProviderIds,
     cinemaList: cinemaList, streamList: streamList, search: search,
     movie: movie, providers: providers, providersCachedOnly: providersCachedOnly, scores: scores,

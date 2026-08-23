@@ -3,7 +3,7 @@
    ⚠️ 這裡永遠不會有 API 金鑰。金鑰只存在使用者自己裝置的 localStorage。 */
 
 /* 唯一版本來源：改版就 +1，sw.js 的快取名稱會跟著換 */
-var HLM_VER = "1.0.2";
+var HLM_VER = "1.1.0";
 
 var HLM_CFG = {
   ver: HLM_VER,
@@ -20,6 +20,12 @@ var HLM_CFG = {
   lang: "zh-TW",
   timeoutMs: 12000,
 
+  /* PTT 鄉民風向：同源的靜態 JSON，由 GitHub Actions 每天產一次
+     ⚠️ 一定要相對路徑（GitHub Pages 站在 /repo-name/ 子路徑底下，開頭 "/" 會 404）
+     ⚠️ 這個檔**不進 sw.js 的殼快取**，殼快取跟著 HLM_VER 走，會把它凍到下次改版 */
+  pttUrl: "./data/ptt-movie.json",
+  pttStaleDays: 3,        /* 超過幾天沒更新就標成過期（用 JSON 裡的 updated 判斷，不是抓取時間） */
+
   /* 快取 TTL（毫秒） */
   ttl: {
     movie: 30 * 24 * 3600e3,   /* 電影基本資料 30 天 */
@@ -29,6 +35,9 @@ var HLM_CFG = {
     listStream: 6 * 3600e3,    /* 串流片單 6 小時 */
     search: 6 * 3600e3,        /* 搜尋結果 6 小時 */
     providerIds: 30 * 24 * 3600e3
+    /* ⚠️ 這裡刻意**沒有** PTT：PTT 資料是 network-first，沒有 TTL 快取。
+       「資料新不新」是看 JSON 裡的 updated（門檻 pttStaleDays），不是看什麼時候抓的——
+       爬蟲掛掉時 fetch 會成功但 updated 是舊的，用抓取時間判斷會完全看不出來。 */
   },
 
   /* 快取上限：超過就淘汰最舊的（localStorage 通常只有 5MB） */

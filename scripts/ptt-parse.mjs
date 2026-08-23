@@ -89,12 +89,26 @@ export function postTimeFromUrl(url) {
   return m ? Number(m[1]) * 1000 : null;
 }
 
-/** 相對連結補成絕對網址 */
+/** 只認 PTT 自己的網址。
+    ⚠️ 這是白名單，不是「補全網址」的小工具：
+    列表頁上的 <a href> 是外部輸入，PTT 標題連結**理論上**都是站內相對路徑，
+    但只要出現一個絕對網址（或哪天版面被塞了外站連結），它就會一路寫進 data/ptt-movie.json，
+    然後在 App 上變成一顆可以點的外站連結。所以這裡認不得的一律回 **null**，由上游丟掉。
+    回 null 的情況：外站、protocol-relative（//evil）、javascript:、data:、相對路徑。 */
 export function absUrl(href) {
-  const h = String(href || "");
-  if (/^https?:\/\//.test(h)) return h;
-  return PTT_ORIGIN + (h.startsWith("/") ? h : "/" + h);
+  const h = String(href == null ? "" : href).trim();
+  if (!h) return null;
+  if (/^https?:\/\//i.test(h)) {
+    const m = /^https?:\/\/(?:www\.)?ptt\.cc(\/[^\s]*)?$/i.exec(h);
+    return m ? PTT_ORIGIN + (m[1] || "/") : null;    /* 非 ptt.cc → 丟掉；http 順便升級成 https */
+  }
+  if (h.slice(0, 2) === "//") return null;           /* //evil.example.com/x 會沿用當前協定，等同外站 */
+  if (h[0] !== "/") return null;                     /* javascript: / data: / 相對路徑一律不收 */
+  return PTT_ORIGIN + h;
 }
+
+/** 給消費端用的同一條白名單（App 那邊也會再擋一次，見 js/ui.js 的 pttPostHTML） */
+export const PTT_URL_RE = /^https:\/\/(?:www\.)?ptt\.cc\//;
 
 /* ========== C. 標籤與排除規則 ========== */
 
@@ -163,7 +177,7 @@ export function parseListPage(html) {
   while ((m = re.exec(src))) starts.push(m.index);
 
   const posts = [];
-  const skipped = { deleted: 0, pinned: 0 };
+  const skipped = { deleted: 0, pinned: 0, foreign: 0 };
 
   for (let i = 0; i < starts.length; i++) {
     const chunk = src.slice(starts[i], i + 1 < starts.length ? starts[i + 1] : src.length);
@@ -175,6 +189,7 @@ export function parseListPage(html) {
     if (!link) { skipped.deleted++; continue; }              /* 沒有 <a> ＝ 已被刪除 */
 
     const url = absUrl(link[1]);
+    if (!url) { skipped.foreign = (skipped.foreign || 0) + 1; continue; }   /* 不是 ptt.cc 的連結 → 整篇丟掉 */
     const nrec = SELECTORS.nrec.exec(chunk);
     const date = SELECTORS.date.exec(chunk);
     const author = SELECTORS.author.exec(chunk);
@@ -261,12 +276,28 @@ export function aliasesFor(movie) {
   return list;
 }
 
-/** 片單 → 比對索引 */
+/** 片單 → 比對索引。除了別名，還帶著破平要用的三個欄位（見 matchTitle 的歧義處理）。 */
 export function buildIndex(movies) {
   return (movies || [])
     .filter(m => m && m.id != null)
-    .map(m => ({ id: String(m.id), title: m.title || m.original_title || "", aliases: aliasesFor(m) }))
+    .map(m => ({
+      id: String(m.id),
+      title: m.title || m.original_title || "",
+      inCinema: !!m.inCinema,                        /* 來自 now_playing ＝ 現正上映 */
+      pop: Number(m.popularity) || 0,
+      release: String(m.release_date || ""),
+      aliases: aliasesFor(m)
+    }))
     .filter(m => m.aliases.length > 0);
+}
+
+/* 同分時「哪一部比較可能是鄉民在講的那部」。回傳負數代表 a 排前面。
+   順序：現正上映 → popularity 高 → 上映日新。三個都一樣就是真的分不出來。 */
+export function tieBreak(a, b) {
+  if (a.inCinema !== b.inCinema) return a.inCinema ? -1 : 1;
+  if (a.pop !== b.pop) return b.pop - a.pop;
+  if (a.release !== b.release) return a.release < b.release ? 1 : -1;
+  return 0;
 }
 
 function latinHit(loose, alias) {
@@ -298,17 +329,25 @@ export function matchTitle(titleNoTag, index) {
       }
       if (ok && (!best || a.tight.length > best.len)) best = { len: a.tight.length, alias: a.tight };
     }
-    if (best) hits.push({ id: mv.id, score: best.len, alias: best.alias });
+    if (best) hits.push({ id: mv.id, score: best.len, alias: best.alias, mv });
   }
   if (!hits.length) return { id: null, reason: "none" };
 
   hits.sort((a, b) => b.score - a.score);
-  /* 歧義守衛：最高分有兩部以上不同的片 → 寧可不配。
-     例：片單同時有「沙丘」與「沙丘：第二部」，標題只寫「沙丘」時兩邊都只命中 2 個字。 */
-  if (hits.length > 1 && hits[1].score === hits[0].score && hits[1].id !== hits[0].id) {
-    return { id: null, reason: "ambiguous" };
-  }
-  return { id: hits[0].id, alias: hits[0].alias, score: hits[0].score };
+  const top = hits.filter(h => h.score === hits[0].score);
+  if (top.length === 1) return { id: top[0].id, alias: top[0].alias, score: top[0].score, how: "unique" };
+
+  /* 最高分打平（例：片單裡有好幾部蜘蛛人，標題只寫「蜘蛛人」）。
+     ⚠️ 這裡是「在同一個候選集合裡挑一部」的破平，**不是**放寬命中門檻——
+     命中的標準一個字都沒有降低，「寧可漏抓不要錯配」的原則不變。
+     2026-08-23 真資料實測：12 篇歧義放棄全是蜘蛛人，而討論度最高的片正在掉資料。 */
+  top.sort((x, y) => tieBreak(x.mv, y.mv));
+  const how = !top[0].mv.inCinema === !top[1].mv.inCinema
+    ? (top[0].mv.pop !== top[1].mv.pop ? "popularity"
+      : (top[0].mv.release !== top[1].mv.release ? "release" : null))
+    : "cinema";
+  if (!how) return { id: null, reason: "ambiguous" };   /* 三個條件都一樣 → 真的分不出來，放棄 */
+  return { id: top[0].id, alias: top[0].alias, score: top[0].score, how: how };
 }
 
 /* ========== F. 產出 JSON ========== */
@@ -326,6 +365,10 @@ export function buildPayload({ entries, scanned, source, updated }) {
     if (!movies[id]) movies[id] = { good: 0, ok: 0, bad: 0, posts: [] };
     const slot = TAGS[e.tag];
     if (!slot) continue;
+    /* 寫進檔案前的最後一關：url 不是 ptt.cc 的一律不寫。
+       這一層跟 absUrl() 是兩道**各自獨立**的關卡（各自有測試在守）——
+       檔案一旦被寫壞，App 那邊就會渲染成可以點的外站連結。 */
+    if (!PTT_URL_RE.test(String(e.url || ""))) continue;
     movies[id][slot]++;                       /* 計數用全部的文章，不是只用留下來那 8 則 */
     movies[id].posts.push({
       tag: e.tag, title: e.title, url: e.url, date: e.date || "", push: e.push || 0
@@ -343,9 +386,12 @@ export function buildPayload({ entries, scanned, source, updated }) {
   return {
     updated: updated || new Date().toISOString().replace(/\.\d+Z$/, "Z"),
     source,
+    /* ⚠️ 契約：欄位與順序是 PM 定的，不要自己加減。
+       tagged = matched + ambiguous + unmatched（三個數字要對得起來，PM 讀健康度時不必心算）
+       posts 是掃到的文章總數（含 [討論] 等非雷文），所以 posts >= tagged。 */
     scanned: {
-      pages: scanned.pages | 0, posts: scanned.posts | 0,
-      matched: scanned.matched | 0, unmatched: scanned.unmatched | 0
+      pages: scanned.pages | 0, posts: scanned.posts | 0, tagged: scanned.tagged | 0,
+      matched: scanned.matched | 0, ambiguous: scanned.ambiguous | 0, unmatched: scanned.unmatched | 0
     },
     movies: out
   };

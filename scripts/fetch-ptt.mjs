@@ -117,7 +117,8 @@ export function collectEntries(pages, index, { cutoffTime = 0 } = {}) {
     pages: pages.length, posts: 0, tagged: 0, matched: 0, unmatched: 0,
     tooOld: 0, ambiguous: 0, emptyPages: 0,
     skipped: { reply: 0, forward: 0, notice: 0, deleted: 0 },
-    samples: { ambiguous: [], none: [] }
+    tiebroken: { cinema: 0, popularity: 0, release: 0 },
+    samples: { ambiguous: [], none: [], tiebroken: [] }
   };
   for (const pg of pages) {
     if (!pg.posts.length) stats.emptyPages++;
@@ -131,14 +132,23 @@ export function collectEntries(pages, index, { cutoffTime = 0 } = {}) {
       stats.tagged++;
       const hit = matchTitle(stripTag(p.title), index);
       if (!hit.id) {
-        stats.unmatched++;
+        /* ambiguous（同名破平失敗）與 unmatched（根本沒命中）**分開記**，
+           不然看不出破平規則有沒有效（PM 2026-08-23 要求）。 */
         if (hit.reason === "ambiguous") {
           stats.ambiguous++;
           if (stats.samples.ambiguous.length < 5) stats.samples.ambiguous.push(p.title);
-        } else if (stats.samples.none.length < 5) stats.samples.none.push(p.title);
+        } else {
+          stats.unmatched++;
+          if (stats.samples.none.length < 5) stats.samples.none.push(p.title);
+        }
         continue;
       }
       stats.matched++;
+      if (hit.how && hit.how !== "unique") {
+        stats.tiebroken[hit.how] = (stats.tiebroken[hit.how] || 0) + 1;
+        if (stats.samples.tiebroken.length < 5) stats.samples.tiebroken.push(p.title + "　→ " + hit.alias + "（靠" +
+          ({ cinema: "現正上映", popularity: "熱門度", release: "上映日" })[hit.how] + "破平）");
+      }
       entries.push({ movieId: hit.id, tag, title: p.title, url: p.url, date: p.date, push: p.push });
     }
   }
@@ -176,18 +186,26 @@ async function tmdbJSON(path, params, key) {
 export async function tmdbCatalog(key) {
   const ids = filterableProviderIds();
   const out = new Map();
-  const add = j => (j.results || []).forEach(m => {
-    if (m && m.id) out.set(String(m.id), { id: m.id, title: m.title, original_title: m.original_title });
+  /* inCinema 是同名破平的第一順位（鄉民在電影板講的幾乎都是現正上映的片），
+     所以 now_playing 來的要標記，而且不可以被後面 discover 的同一部片洗掉。 */
+  const add = (j, inCinema) => (j.results || []).forEach(m => {
+    if (!m || !m.id) return;
+    const k = String(m.id), old = out.get(k);
+    out.set(k, {
+      id: m.id, title: m.title, original_title: m.original_title,
+      popularity: Number(m.popularity) || 0, release_date: m.release_date || "",
+      inCinema: inCinema || !!(old && old.inCinema)
+    });
   });
   for (let page = 1; page <= CFG.catalogPages; page++) {
-    add(await tmdbJSON("/movie/now_playing", { region: "TW", language: "zh-TW", page }, key));
+    add(await tmdbJSON("/movie/now_playing", { region: "TW", language: "zh-TW", page }, key), true);
     await sleep(200);
     add(await tmdbJSON("/discover/movie", {
       watch_region: "TW", language: "zh-TW",
       with_watch_monetization_types: "flatrate",
       with_watch_providers: ids.join("|"),
       sort_by: "popularity.desc", include_adult: false, page
-    }, key));
+    }, key), false);
     await sleep(200);
   }
   return [...out.values()];
@@ -251,12 +269,14 @@ export async function main(argv) {
   /* ---- 2. 爬 PTT ---- */
   const cutoffTime = Date.now() - CFG.daysBack * 86400e3;
   const pages = [];
+  let foreign = 0;                 /* 連結不是 ptt.cc 而被丟掉的文章數（正常應該一直是 0） */
   let stopReason = "抓滿 " + maxPages + " 頁";
 
   if (offline) {
     for (const f of readdirSync(fxDir).filter(n => /^ptt-list-.*\.html$/.test(n)).sort()) {
       const html = readFileSync(join(fxDir, f), "utf8");
       const r = parseListPage(html);
+      foreign += r.skipped.foreign;
       pages.push({ url: "fixture:" + f, posts: r.posts, raw: r.raw, head: html.slice(0, 1000) });
       log("  " + f + "：" + r.posts.length + " 篇");
     }
@@ -282,6 +302,7 @@ export async function main(argv) {
       }
       const parsed = parseListPage(r.body);
       /* 只留前 1000 字，出事時的診斷要印得出來（整份 HTML 留著會吃記憶體） */
+      foreign += parsed.skipped.foreign;
       pages.push({ url, posts: parsed.posts, raw: parsed.raw, head: r.body.slice(0, 1000) });
       log("  [" + (i + 1) + "/" + maxPages + "] " + url.replace(PTT_ORIGIN + "/bbs/" + CFG.board + "/", "") +
         " → " + parsed.posts.length + " 篇" +
@@ -319,7 +340,10 @@ export async function main(argv) {
   /* ---- 5. 產出 ---- */
   const payload = buildPayload({
     entries,
-    scanned: { pages: stats.pages, posts: stats.posts, matched: stats.matched, unmatched: stats.unmatched },
+    scanned: {
+      pages: stats.pages, posts: stats.posts, tagged: stats.tagged,
+      matched: stats.matched, ambiguous: stats.ambiguous, unmatched: stats.unmatched
+    },
     source: CFG.index
   });
   const changed = writeIfChanged(outFile, payload);
@@ -334,13 +358,24 @@ export async function main(argv) {
   console.log("    ├ 太舊略過  : " + stats.tooOld);
   console.log("    ├ 回文/轉錄 : " + (stats.skipped.reply + stats.skipped.forward + stats.skipped.notice));
   console.log("    └ 有雷標籤  : " + stats.tagged);
+  if (foreign) {
+    console.log("  ⚠️ 連結不是 ptt.cc : " + foreign + " 篇（整篇丟掉）—— 正常應該是 0，");
+    console.log("     不是 0 的話去看 SELECTORS.titleLink 抓到了什麼，別讓外站連結進資料檔");
+  }
   console.log("  比對到片      : " + stats.matched + " 篇 → " + nMovies + " 部片");
-  console.log("  沒比對到      : " + stats.unmatched + " 篇（其中歧義放棄 " + stats.ambiguous + " 篇）");
+  console.log("    └ 同名破平  : " + (stats.tiebroken.cinema + stats.tiebroken.popularity + stats.tiebroken.release) +
+    " 篇（現正上映 " + stats.tiebroken.cinema + "／熱門度 " + stats.tiebroken.popularity + "／上映日 " + stats.tiebroken.release + "）");
+  console.log("  歧義放棄      : " + stats.ambiguous + " 篇（破平也分不出來）");
+  console.log("  沒比對到      : " + stats.unmatched + " 篇（片單以外的片，正常）");
   console.log("  比對率        : " + (stats.tagged ? Math.round(stats.matched / stats.tagged * 100) : 0) + "%");
   console.log("  檔案          : " + outFile.replace(ROOT + "/", "") + (changed ? "　（有變動，會 commit）" : "　（內容沒變，不動它）"));
   console.log("  花了          : " + Math.round((Date.now() - t0) / 1000) + " 秒");
+  if (stats.samples.tiebroken.length) {
+    console.log("  同名破平的例子（確認有沒有配錯片，這是最該人工看一眼的地方）：");
+    for (const t of stats.samples.tiebroken) console.log("    · " + t);
+  }
   if (stats.samples.ambiguous.length) {
-    console.log("  歧義放棄的例子（寧可漏抓不要錯配）：");
+    console.log("  歧義放棄的例子（破平也分不出來，寧可漏抓不要錯配）：");
     for (const t of stats.samples.ambiguous) console.log("    · " + t);
   }
   if (stats.samples.none.length) {

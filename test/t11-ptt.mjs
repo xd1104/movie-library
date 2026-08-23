@@ -9,7 +9,8 @@ import { dirname, join } from "node:path";
 import { ok, section, summary } from "./harness.mjs";
 import {
   parseListPage, prevPageUrl, isAgeGate, parseTag, stripTag, skipReason, parsePush,
-  postTimeFromUrl, buildIndex, matchTitle, buildPayload, healthCheck, aliasesFor, MATCH
+  postTimeFromUrl, buildIndex, matchTitle, buildPayload, healthCheck, aliasesFor, MATCH,
+  absUrl, PTT_URL_RE
 } from "../scripts/ptt-parse.mjs";
 import {
   collectEntries, payloadEquals, writeIfChanged, redact, getListPage, tmdbCatalog, CFG
@@ -19,6 +20,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const R = join(HERE, "..") + "/";
 const fx = f => fs.readFileSync(join(HERE, "fixtures", f), "utf8");
 const A = fx("ptt-list-a.html"), B = fx("ptt-list-b.html"), OVER18 = fx("ptt-over18.html");
+const POISONPAGE = fx("ptt-list-c-poison.html");
 const CATALOG = JSON.parse(fx("tmdb-catalog.json")).movies;
 const INDEX = buildIndex(CATALOG);
 const NOW = Date.parse("2026-08-23T00:00:00Z");
@@ -121,6 +123,32 @@ section("4. 片名比對（寧可漏抓不要錯配）");
   ok(m("[好雷] 完全沒聽過的片名 abcdefg").id === null, "配不到就是配不到");
   ok(m("[好雷] 這是一部很棒的片").reason === "none", "配不到的原因是 none");
 
+  /* ---- 同名破平（2026-08-23 真資料：12 篇歧義放棄全是蜘蛛人，全丟掉太可惜）----
+     ⚠️ 這是「在同一個候選集合裡挑一部」，命中門檻一個字都沒有放寬。 */
+  const SP = (over) => buildIndex([
+    { id: "11", title: "蜘蛛人：重生日", original_title: "Spider-Man: Brand New Day",
+      popularity: 50, release_date: "2026-07-30", ...(over && over[11] || {}) },
+    { id: "12", title: "蜘蛛人：無家日", original_title: "Spider-Man: No Way Home",
+      popularity: 50, release_date: "2021-12-15", ...(over && over[12] || {}) },
+    { id: "13", title: "蜘蛛人：返校日", original_title: "Spider-Man: Homecoming",
+      popularity: 50, release_date: "2017-07-05", ...(over && over[13] || {}) }
+  ]);
+  const cine = matchTitle("蜘蛛人4", SP({ 12: { inCinema: true } }));
+  ok(cine.id === "12" && cine.how === "cinema",
+    "★ 同名打平 → 現正上映的優先（鄉民在電影板講的幾乎都是上映中的片）", JSON.stringify(cine));
+  const pop = matchTitle("大推蜘蛛人 (無預備知識也好看)", SP({ 13: { popularity: 900 } }));
+  ok(pop.id === "13" && pop.how === "popularity", "★ 都不在電影院 → popularity 高的優先", JSON.stringify(pop));
+  const rel = matchTitle("蜘蛛人~~~", SP());
+  ok(rel.id === "11" && rel.how === "release", "★ 熱門度也一樣 → 上映日新的優先", JSON.stringify(rel));
+  const same = matchTitle("蜘蛛人三刷心得", buildIndex([
+    { id: "21", title: "蜘蛛人：甲", popularity: 7, release_date: "2026-01-01" },
+    { id: "22", title: "蜘蛛人：乙", popularity: 7, release_date: "2026-01-01" }
+  ]));
+  ok(same.id === null && same.reason === "ambiguous",
+    "★ 三個條件都一樣 → 還是放棄（寧可漏抓不要錯配）", JSON.stringify(same));
+  ok(matchTitle("完全沒聽過的片 zzzz", SP({ 11: { inCinema: true } })).id === null,
+    "破平規則沒有讓命中門檻變鬆");
+
   const ap = aliasesFor({ title: "沙丘：第二部", original_title: "Dune: Part Two" }).map(a => a.tight);
   ok(ap.includes("沙丘第二部") && ap.includes("沙丘") && ap.includes("沙丘2"),
     "★ 別名有：全名／冒號前那段／中文數字轉阿拉伯數字", ap.join(","));
@@ -137,8 +165,21 @@ section("5. 整輪跑完（假測資 → JSON）");
   ok(stats.tooOld === 1, "★ 三個月以前的舊文有濾掉", stats.tooOld);
   ok(stats.skipped.reply === 1, "Re: 有濾掉", JSON.stringify(stats.skipped));
   ok(stats.tagged === 7, "帶雷標籤的 7 篇", stats.tagged);
-  ok(stats.matched + stats.unmatched === stats.tagged, "matched + unmatched = 有標籤的篇數");
+  ok(stats.matched + stats.ambiguous + stats.unmatched === stats.tagged, "matched + ambiguous + unmatched = 有標籤的篇數");
   ok(stats.emptyPages === 0, "沒有解析不到文章的頁");
+
+  /* ambiguous 與 unmatched 要**分開記**，不然看不出破平規則有沒有效 */
+  const one = (title) => [{ url: "x", posts: [{ title, url: "https://www.ptt.cc/bbs/movie/M.1787184000.A.111.html",
+    date: "8/20", push: 5, time: 1787184000000 }] }];
+  const twin = buildIndex([
+    { id: "21", title: "蜘蛛人：甲", popularity: 7, release_date: "2026-01-01" },
+    { id: "22", title: "蜘蛛人：乙", popularity: 7, release_date: "2026-01-01" }
+  ]);
+  const ambS = collectEntries(one("[好雷] 蜘蛛人三刷心得"), twin, {}).stats;
+  ok(ambS.ambiguous === 1 && ambS.unmatched === 0,
+    "★ 破平分不出來 → 記成 ambiguous，不可以混進 unmatched", JSON.stringify({ a: ambS.ambiguous, u: ambS.unmatched }));
+  const noneS = collectEntries(one("[好雷] 完全沒聽過的片 zzzz"), twin, {}).stats;
+  ok(noneS.unmatched === 1 && noneS.ambiguous === 0, "★ 根本沒命中 → 記成 unmatched");
 
   const pay = buildPayload({ entries, scanned: stats, source: CFG.index, updated: "2026-08-23T04:00:00Z" });
   const ids = Object.keys(pay.movies);
@@ -152,9 +193,11 @@ section("5. 整輪跑完（假測資 → JSON）");
   ok(pay.movies["693134"].posts.every(p => /^https:\/\/www\.ptt\.cc\/bbs\/movie\/M\./.test(p.url)),
     "每則都有可以點過去 PTT 的網址");
   ok(pay.updated === "2026-08-23T04:00:00Z" && pay.source === CFG.index, "updated / source 欄位在");
-  ok(pay.scanned.pages === 2 && typeof pay.scanned.posts === "number" &&
-     typeof pay.scanned.matched === "number" && typeof pay.scanned.unmatched === "number",
-    "scanned 四個欄位都在", JSON.stringify(pay.scanned));
+  ok(Object.keys(pay.scanned).join(",") === "pages,posts,tagged,matched,ambiguous,unmatched",
+    "★ scanned 六個欄位、順序固定", Object.keys(pay.scanned).join(","));
+  ok(pay.scanned.tagged === pay.scanned.matched + pay.scanned.ambiguous + pay.scanned.unmatched,
+    "★ tagged = matched + ambiguous + unmatched（PM 讀健康度不必心算）", JSON.stringify(pay.scanned));
+  ok(pay.scanned.posts >= pay.scanned.tagged, "posts 含非雷文，所以 >= tagged");
   ok(Object.keys(pay).join(",") === "updated,source,scanned,movies", "★ 契約欄位不多不少", Object.keys(pay).join(","));
 
   /* 每部片最多 8 則 */
@@ -305,6 +348,43 @@ section("11. 整支 main() 走一遍（假 fetch，不連外）");
   ok(!lines.join("\n").includes("TMDBKEY_GOOD_NOT_A_REAL_KEY"), "★ 整輪的紀錄裡沒有金鑰");
   ok(/掃到文章|比對到片/.test(lines.join("\n")), "紀錄有給 PM 看的摘要");
   fs.rmSync(dirname(out), { recursive: true, force: true });
+}
+
+section("12. 網址白名單：只能是 ptt.cc（毒測資）");
+{
+  /* ⚠️ 這一節每一條都配一筆「不是 ptt.cc」的毒測資。
+     只有正常測資的話，「只允許 X」驗的是 fixture 不是程式（2026-08-23 QA 退件的教訓）。 */
+  const POISON = [
+    ["javascript:window.__pwn4=1", "javascript: scheme"],
+    ["data:text/html,<h1>x", "data: scheme"],
+    ["https://evil.example.com/phish", "外站絕對網址"],
+    ["//evil.example.com/x", "protocol-relative（會沿用當前協定）"],
+    ["http://ptt.cc.evil.com/x", "把 ptt.cc 放在網域前面騙人"],
+    ["https://notptt.cc/x", "相似網域"],
+    ["bbs/movie/x.html", "相對路徑"],
+    ["", "空字串"]
+  ];
+  for (const [u, why] of POISON) ok(absUrl(u) === null, "★ absUrl 擋掉：" + why + "（" + u + "）", absUrl(u));
+  ok(absUrl("/bbs/movie/M.1.A.B.html") === "https://www.ptt.cc/bbs/movie/M.1.A.B.html", "站內相對路徑補成絕對網址");
+  ok(absUrl("http://ptt.cc/bbs/movie/x.html") === "https://www.ptt.cc/bbs/movie/x.html", "站內 http 升級成 https");
+  ok(absUrl("https://www.ptt.cc/bbs/movie/x.html") === "https://www.ptt.cc/bbs/movie/x.html", "本來就對的原樣留著");
+
+  const c = parseListPage(POISONPAGE);
+  ok(c.raw === 5 && c.posts.length === 2, "★ 毒測資頁 5 篇只收下 2 篇", c.posts.length);
+  ok(c.skipped.foreign === 3, "★ 3 篇因為連結不是 ptt.cc 被丟掉", JSON.stringify(c.skipped));
+  ok(c.posts.every(p => PTT_URL_RE.test(p.url)), "★ 留下來的網址全部是 ptt.cc", c.posts.map(p => p.url).join(" "));
+  ok(c.posts[0].url === "https://www.ptt.cc/bbs/movie/M.1787184001.A.C01.html", "站內絕對網址有升級成 https");
+
+  /* 第二道關卡：就算有人繞過 absUrl 把髒東西塞進 entries，也不可以寫進檔案 */
+  const dirty = [
+    { movieId: "1", tag: "好雷", title: "乾淨的", url: "https://www.ptt.cc/bbs/movie/M.1.A.A.html", date: "8/1", push: 9 },
+    { movieId: "1", tag: "好雷", title: "毒的", url: "javascript:window.__pwn5=1", date: "8/1", push: 99 },
+    { movieId: "1", tag: "負雷", title: "外站", url: "https://evil.example.com/x", date: "8/1", push: 98 }
+  ];
+  const dp = buildPayload({ entries: dirty, scanned: {}, source: CFG.index });
+  ok(dp.movies["1"].posts.length === 1 && PTT_URL_RE.test(dp.movies["1"].posts[0].url),
+    "★ buildPayload 只寫得出 ptt.cc 的網址", JSON.stringify(dp.movies["1"].posts.map(p => p.url)));
+  ok(dp.movies["1"].good === 1 && dp.movies["1"].bad === 0, "被擋掉的那幾篇連票數都不算");
 }
 
 process.exit(summary() ? 1 : 0);

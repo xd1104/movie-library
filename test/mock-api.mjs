@@ -41,12 +41,89 @@ export const EXTRA = [
   mv(25, "萬人示範", "Many Votes", "2017-12-15", 6.8, 15200, 58, "/m.jpg")        // 萬人評換算
 ];
 
+/* ---- 假的 PTT 資料（同源 ./data/ptt-movie.json）----
+   key 對應上面假片單的 TMDB id。刻意涵蓋規格 §9.6 的五種狀態。 */
+function pp(tag, title, push, date) {
+  return { tag, title, url: "https://www.ptt.cc/bbs/movie/M.17871840" + String(push).padStart(2, "0") + ".A.ABC.html", date, push };
+}
+export const PTT_MOVIES = {
+  /* 一面倒好雷：前 4 則沒有負雷 → 會觸發「保底異見」把第 6 則的負雷拉上來 */
+  "1": { good: 21, ok: 2, bad: 1, posts: [
+    pp("好雷", "[好雷] 蜘蛛人 動畫的極限", 128, "8/22"),
+    pp("好雷", "[好雷] 邁爾斯的成長寫得超完整", 86, "8/21"),
+    pp("好雷", "[好雷] 音樂跟分鏡值回票價", 74, "8/21"),
+    pp("普雷", "[普雷] 好看 但資訊量太大", 41, "8/20"),
+    pp("好雷", "[好雷] 二刷才看懂很多細節", 33, "8/20"),
+    pp("負雷", "[負雷] 節奏太趕 不喜歡這種剪法", 23, "8/19"),
+    pp("好雷", "[好雷] 配樂神", 12, "8/18"),
+    pp("好雷", "[好雷] 大銀幕必看", 5, "8/18")
+  ]},
+  /* 好雷佔多數 + 有 8 則可以展開 */
+  "12": { good: 12, ok: 3, bad: 1, posts: [
+    pp("好雷", "[好雷] 沙丘2 視聽饗宴 IMAX 值回票價", 145, "8/20"),
+    pp("好雷", "[好雷] 沙丘2 節奏比一集好太多", 98, "8/20"),
+    pp("普雷", "[普雷] 沙丘2 有點長", 62, "8/19"),
+    pp("負雷", "[負雷] 沙丘2 睡著兩次", 44, "8/19"),
+    pp("好雷", "[好雷] 沙丘2 音效無敵", 31, "8/18"),
+    pp("好雷", "[好雷] 沙丘2 二刷心得", 20, "8/18"),
+    pp("好雷", "[好雷] 沙丘2 沙蟲那段", 11, "8/17"),
+    pp("好雷", "[好雷] 沙丘2 值得", 6, "8/17")
+  ]},
+  /* 樣本太少（<=3）：不畫比例條、不給結論詞 */
+  "4": { good: 2, ok: 1, bad: 0, posts: [
+    pp("好雷", "[好雷] 角頭 台片有進步", 18, "8/15"),
+    pp("好雷", "[好雷] 角頭 動作場面不錯", 9, "8/14"),
+    pp("普雷", "[普雷] 角頭 劇情老套", 3, "8/13")
+  ]},
+  /* 負雷居多 */
+  "22": { good: 1, ok: 1, bad: 5, posts: [
+    pp("負雷", "[負雷] 小丑2 這是什麼", 210, "8/12"),
+    pp("負雷", "[負雷] 小丑2 浪費兩小時", 150, "8/12"),
+    pp("好雷", "[好雷] 小丑2 我覺得還行", 40, "8/11")
+  ]},
+  /* 評價兩極：會多出 .divergent 提示框 */
+  "3": { good: 7, ok: 3, bad: 6, posts: [
+    pp("好雷", "[好雷] 侏羅紀 爽片就是要這樣", 88, "8/10"),
+    pp("負雷", "[負雷] 侏羅紀 劇本崩壞", 77, "8/10"),
+    pp("好雷", "[好雷] 侏羅紀 恐龍很帥", 55, "8/09"),
+    pp("負雷", "[負雷] 侏羅紀 看不下去", 33, "8/09")
+  ]}
+};
+export function pttPayload(over = {}) {
+  return {
+    updated: new Date(Date.now() - 3600e3).toISOString().replace(/\.\d+Z$/, "Z"),
+    source: "https://www.ptt.cc/bbs/movie/index.html",
+    scanned: { pages: 40, posts: 797, tagged: 158, matched: 104, ambiguous: 0, unmatched: 54 },
+    movies: PTT_MOVIES,
+    ...over
+  };
+}
+
 export function makeFetch(opts = {}) {
   const keys = { tmdb: GOOD_TMDB, omdb: GOOD_OMDB, ...(opts.keys || {}) };
   const fail = opts.fail || {};       // {tmdb:'401'|'429'|'500'|'net', omdb:...}
 
   return function fetch(url) {
     CALLS.list.push(String(url));
+
+    /* 同源的 PTT 資料檔（相對路徑，不能丟給 new URL 直接解析）
+       opts.ptt: "net"（連不到）／"404"／"bad"（不是 JSON）／預設成功 */
+    if (/ptt-movie\.json/.test(String(url))) {
+      const mode = opts.ptt || "ok";
+      const res = (body, status = 200) => Promise.resolve({
+        ok: status >= 200 && status < 300, status, text: () => Promise.resolve(body)
+      });
+      if (mode === "net") return Promise.reject(new TypeError("Failed to fetch"));
+      if (mode === "404") return res("<!doctype html><h1>404</h1>", 404);
+      if (mode === "bad") return res("<!doctype html>這不是 JSON", 200);
+      /* 是合法 JSON、但不是我們要的格式（例如 GitHub Pages 回了別的東西） */
+      if (mode === "nomovies") return res(JSON.stringify({ updated: "2026-08-23T00:00:00Z", hello: 1 }));
+      const body = JSON.stringify(opts.pttData || pttPayload());
+      const d = (opts.delay || {}).ptt || 0;
+      if (d) return new Promise(r2 => setTimeout(() => r2({ ok: true, status: 200, text: () => Promise.resolve(body) }), d));
+      return res(body);
+    }
+
     const u = new URL(String(url));
     const p = u.pathname, q = u.searchParams;
     const isTmdb = u.hostname === "api.themoviedb.org";
