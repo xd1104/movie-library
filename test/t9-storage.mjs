@@ -52,16 +52,16 @@ section("M28 過期快取只在「連不上」的時候頂替；金鑰錯一定�
   ok(/連不上網路，顯示/.test(html(c.d, "hintline")), "而且有講清楚是舊的");
 }
 
-section("補強：電影院「依評價」排序的完整順序（原本只驗頭尾，M09 殺不掉）");
+section("補強：電影院兩種排序的完整順序（只驗頭尾的話，排序壞掉殺不掉）");
 {
   const { w, d } = await boot({ store: ST });
   await tick(w, 100);
   const titles = () => [...d.querySelectorAll(".rowtitle")].map(e => e.textContent);
-  ok(titles().join(",") === "蜘蛛人：穿越新宇宙 終章,罪人,玩具總動員 5,侏羅紀世界：重生,角頭－鬥陣欸,我家的事",
-    "★ 依評價：完全依 TMDB 分數由高到低 → " + titles().join(","));
-  $(d, "sortbtn").click(); await tick(w, 60);
   ok(titles().join(",") === "蜘蛛人：穿越新宇宙 終章,玩具總動員 5,侏羅紀世界：重生,罪人,角頭－鬥陣欸,我家的事",
-    "★ 依熱門：完全依 popularity → " + titles().join(","));
+    "★ 預設依熱門：完全依 popularity → " + titles().join(","));
+  $(d, "sortbtn").click(); await tick(w, 60);
+  ok(titles().join(",") === "蜘蛛人：穿越新宇宙 終章,罪人,玩具總動員 5,侏羅紀世界：重生,角頭－鬥陣欸,我家的事",
+    "★ 切成依評價：完全依 TMDB 分數由高到低 → " + titles().join(","));
 }
 
 process.exit(summary() ? 1 : 0);

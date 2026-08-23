@@ -75,7 +75,8 @@ export function makeFetch(opts = {}) {
         { provider_id: 426, provider_name: "friDay影音" },
         { provider_id: 457, provider_name: "MyVideo" }
       ]});
-      if (p === "/3/movie/now_playing") return json({ results: NOW_PLAYING });
+      /* 測試可以用 mock:{nowPlaying:{results:[...]}} 換掉整份電影院片單 */
+      if (p === "/3/movie/now_playing") return json(opts.nowPlaying || { results: NOW_PLAYING });
       if (p === "/3/discover/movie") {
         const wp = q.get("with_watch_providers");
         if (wp === "8") return json({ results: DISCOVER_NETFLIX });

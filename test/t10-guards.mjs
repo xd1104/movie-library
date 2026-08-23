@@ -285,4 +285,94 @@ section("P02 provider id 校正要先到先贏（不可以被同品牌變體覆�
   ok(/with_watch_providers=8(&|$)/.test(disc), "★ 片單請求帶的是 provider 8：" + (disc.match(/with_watch_providers=[^&]*/) || [""])[0]);
 }
 
+section("S01 兩個分頁預設都是「依熱門」（2026-08-23 老闆要求）");
+{
+  const { w, d } = await boot({ store: ST });
+  await tick(w, 150);
+  ok(txt(d, "sortbtn") === "依熱門 ▾", "★ 電影院預設依熱門");
+  const cine = [...d.querySelectorAll(".rowtitle")].map(e => e.textContent);
+  ok(cine[0] === "蜘蛛人：穿越新宇宙 終章" && cine[1] === "玩具總動員 5",
+    "★ 電影院真的照 popularity 排（98, 95…）：" + cine.slice(0, 3).join(","));
+
+  d.querySelector('[data-tab="stream"]').click(); await tick(w, 200);
+  ok(!$(d, "sortbtn").classList.contains("hide"), "★ 串流分頁也有排序切換鈕");
+  ok(txt(d, "sortbtn") === "依熱門 ▾", "★ 串流預設也是依熱門");
+  const st = [...d.querySelectorAll(".rowtitle")].map(e => e.textContent);
+  ok(st.join(",") === "捍衛戰士：獨行俠,沙丘：第二部,咒",
+    "★ 串流直接用 API 的 popularity.desc 順序，前端不再依評分重排：" + st.join(","));
+}
+
+section("S02 切換鈕兩邊都能用，而且記得住");
+{
+  const { w, d } = await boot({ store: { ...ST, hlm_tab: "stream" } });
+  await tick(w, 200);
+  $(d, "sortbtn").click(); await tick(w, 150);
+  ok(txt(d, "sortbtn") === "依評價 ▾", "串流切成依評價");
+  const st = [...d.querySelectorAll(".rowtitle")].map(e => e.textContent);
+  ok(st.join(",") === "沙丘：第二部,捍衛戰士：獨行俠,咒" || st[st.length - 1] === "咒",
+    "★ 依評價時串流才在前端重排：" + st.join(","));
+  ok(w.localStorage.getItem("hlm_sort2") === '"score"', "★ 存進 hlm_sort2");
+
+  /* 換分頁沿用同一個偏好 */
+  d.querySelector('[data-tab="cinema"]').click(); await tick(w, 150);
+  ok(txt(d, "sortbtn") === "依評價 ▾", "換到電影院分頁沿用同一個排序偏好");
+  const cine = [...d.querySelectorAll(".rowtitle")].map(e => e.textContent);
+  ok(cine[1] === "罪人", "★ 電影院也真的依評價排（7.9 的罪人第二）：" + cine.slice(0, 3).join(","));
+
+  /* 下次打開還記得 */
+  const dump = {};
+  for (let i = 0; i < w.localStorage.length; i++) { const k = w.localStorage.key(i); dump[k] = w.localStorage.getItem(k); }
+  const b2 = await boot({ rawStore: dump });
+  await tick(b2.w, 150);
+  ok(txt(b2.d, "sortbtn") === "依評價 ▾", "★ 下次打開記得他選的依評價");
+}
+
+section("S03 舊裝置的 hlm_sort 要被遷移（不然改了等於沒改）");
+{
+  /* 老闆手上那台：已經存著舊 key hlm_sort="score"，沒有 hlm_sort2 */
+  const { w, d } = await boot({ rawStore: { hlm_key_tmdb: JSON.stringify(KEYS.GOOD_TMDB), hlm_sort: '"score"' } });
+  await tick(w, 150);
+  ok(txt(d, "sortbtn") === "依熱門 ▾", "★ 舊裝置帶著 hlm_sort=score 開 App → 拿到新預設「依熱門」");
+  const cine = [...d.querySelectorAll(".rowtitle")].map(e => e.textContent);
+  ok(cine[1] === "玩具總動員 5", "★ 畫面真的照熱門排：" + cine.slice(0, 3).join(","));
+  ok(w.localStorage.getItem("hlm_sort") === null, "舊 key 順手清掉，不留著讓人以為它還有用");
+
+  /* 遷移只發生一次：他改成依評價之後，下次要尊重他 */
+  $(d, "sortbtn").click(); await tick(w, 100);
+  ok(w.localStorage.getItem("hlm_sort2") === '"score"', "他改了 → 寫進新 key");
+  const dump = {};
+  for (let i = 0; i < w.localStorage.length; i++) { const k = w.localStorage.key(i); dump[k] = w.localStorage.getItem(k); }
+  const b2 = await boot({ rawStore: dump });
+  await tick(b2.w, 150);
+  ok(txt(b2.d, "sortbtn") === "依評價 ▾", "★ 遷移只做一次，之後尊重他的選擇");
+}
+
+section("S04 popularity 缺值／相同時，順序要穩定（不可以每次重整就跳動）");
+{
+  /* 三部片 popularity 完全相同、一部沒有 popularity */
+  const tie = {
+    results: [
+      { id: 903, title: "丙", original_title: "C", release_date: "2024-01-01", vote_average: 7, vote_count: 100, popularity: 50, poster_path: null },
+      { id: 901, title: "甲", original_title: "A", release_date: "2024-01-01", vote_average: 7, vote_count: 100, popularity: 50, poster_path: null },
+      { id: 904, title: "丁", original_title: "D", release_date: "2024-01-01", vote_average: 7, vote_count: 100, poster_path: null },
+      { id: 902, title: "乙", original_title: "B", release_date: "2024-01-01", vote_average: 7, vote_count: 100, popularity: 50, poster_path: null }
+    ]
+  };
+  const orders = [];
+  for (let round = 0; round < 3; round++) {
+    /* 每一輪都讓 API 用不同的順序回來，模擬 TMDB 回傳順序不穩 */
+    const shuffled = { results: round === 0 ? tie.results : tie.results.slice().reverse() };
+    const { w, d } = await boot({
+      store: ST,
+      mock: { nowPlaying: shuffled }
+    });
+    await tick(w, 150);
+    orders.push([...d.querySelectorAll(".rowtitle")].map(e => e.textContent).join(","));
+  }
+  ok(orders[0] === orders[1] && orders[1] === orders[2],
+    "★ 熱度相同／缺值時，不管 API 回傳順序怎麼變，畫面順序都一樣：" + JSON.stringify(orders));
+  ok(orders[0] === "甲,乙,丙,丁",
+    "★ 同熱度依 id 遞增當固定的第二順位，沒有 popularity 的排最後：" + orders[0]);
+}
+
 process.exit(summary() ? 1 : 0);

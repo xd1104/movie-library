@@ -9,7 +9,7 @@ section("4. 電影院分頁（狀態 1/5/6）");
   const { w, d, calls } = await boot({ store: ST });
   await tick(w, 60);
   ok(txt(d, "listTitle") === "現在電影院上映中 · 6 部", "標題：" + txt(d, "listTitle"));
-  ok(titles(d)[0] === "蜘蛛人：穿越新宇宙 終章", "預設依評價排序，8.4 在最前：" + titles(d).join(","));
+  ok(titles(d)[0] === "蜘蛛人：穿越新宇宙 終章", "預設依熱門排序，pop 98 在最前：" + titles(d).join(","));
   ok(titles(d)[titles(d).length - 1] === "我家的事", "沒有評分的排最後");
   const h = html(d, "list");
   ok(/TMDB<\/span><span class="v"[^>]*>8\.4</.test(h), "TMDB 膠囊 = 標籤 + 10 分制一位小數");
@@ -19,14 +19,14 @@ section("4. 電影院分頁（狀態 1/5/6）");
   ok(/tag cinema/.test(h) && /上映中/.test(h), "電影院分頁每列有「上映中」標籤");
   ok(/列表分數是 <b>TMDB 觀眾評分<\/b>/.test(html(d, "hintline")), "列表頂端有一行說明分數來源");
   ok(!$(d, "sortbtn").classList.contains("hide"), "電影院分頁有排序切換");
-  ok(txt(d, "sortbtn") === "依評價 ▾", "預設依評價");
+  ok(txt(d, "sortbtn") === "依熱門 ▾", "★ 預設是依熱門（2026-08-23 老闆要求）");
   ok(calls.list.filter(u => u.includes("omdbapi")).length === 0, "★ 列表頁完全沒有呼叫 OMDb");
   ok(calls.list.filter(u => /\/movie\/\d+\/watch\/providers/.test(u)).length === 0, "電影院分頁不去逐片抓平台（省呼叫）");
 
   $(d, "sortbtn").click(); await tick(w, 40);
-  ok(txt(d, "sortbtn") === "依熱門 ▾" && titles(d)[0] === "蜘蛛人：穿越新宇宙 終章", "切依熱門（pop 98 也是蜘蛛人）");
-  ok(titles(d)[1] === "玩具總動員 5", "依熱門第二名是 pop 95：" + titles(d).join(","));
-  ok(w.localStorage.getItem("hlm_sort") === '"pop"', "排序有持久化");
+  ok(txt(d, "sortbtn") === "依評價 ▾", "按一下切成依評價");
+  ok(titles(d)[1] === "罪人", "依評價第二名是 7.9 的罪人：" + titles(d).join(","));
+  ok(w.localStorage.getItem("hlm_sort2") === '"score"', "排序有持久化（存在 hlm_sort2）");
 }
 
 section("5. 串流分頁 + 平台篩選（狀態 2/3/4）");
@@ -35,9 +35,10 @@ section("5. 串流分頁 + 平台篩選（狀態 2/3/4）");
   await tick(w, 60);
   d.querySelector('[data-tab="stream"]').click(); await tick(w, 80);
   ok(txt(d, "listTitle") === "訂閱就能看 · 3 部", "串流片單：" + txt(d, "listTitle"));
-  { const sc = rows(d).map(r => parseFloat((r.querySelector(".tpill .v")||{textContent:"0"}).textContent) || 0);
-    ok(sc.every((v, i) => i === 0 || sc[i-1] >= v), "串流固定依評分由高到低：" + sc.join(",")); }
-  ok($(d, "sortbtn").classList.contains("hide"), "串流分頁不給排序切換");
+  ok(titles(d).join(",") === "捍衛戰士：獨行俠,沙丘：第二部,咒",
+    "★ 串流預設吃 API 的 popularity.desc 順序，前端不重排：" + titles(d).join(","));
+  ok(!$(d, "sortbtn").classList.contains("hide"), "★ 串流分頁也有排序切換（2026-08-23 老闆要求）");
+  ok(txt(d, "sortbtn") === "依熱門 ▾", "★ 串流預設也是依熱門");
   ok(!$(d, "pfWrap").classList.contains("hide"), "串流分頁才有平台篩選列");
   ok(/全部平台/.test(html(d, "pfbar")) && /Netflix/.test(html(d, "pfbar")), "篩選列第一顆是全部平台");
   ok(!/Apple TV|Google TV/.test(html(d, "pfbar")), "Apple TV／Google TV 不進篩選列");

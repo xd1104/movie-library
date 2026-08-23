@@ -10,7 +10,7 @@
   /* ---------- 狀態 ---------- */
   var state = {
     tab: S.get("hlm_tab", "cinema") === "stream" ? "stream" : "cinema",
-    sort: S.get("hlm_sort", "score") === "pop" ? "pop" : "score",
+    sort: readSortPref(),
     pf: S.get("hlm_pf", null),
     mysubs: S.get("hlm_mysubs", []) || [],
     recent: S.get("hlm_recent", []) || [],
@@ -20,6 +20,17 @@
     cinemaIds: {}
   };
   function knownBrand(k) { return !!HLM_BRAND[k]; }
+
+  /* 排序偏好。2026-08-23 老闆要求電影院與串流**都預設依熱門**（理由見 CLAUDE.md 第 11 條）。
+     ⚠️ 刻意換一個新的 key `hlm_sort2`：他手上那台已經存著舊的 hlm_sort="score"，
+     只改預設值的話那台會繼續吃舊值、等於沒改。換 key 讓所有裝置**拿一次新預設**，
+     之後再尊重他自己的選擇。舊 key 順手清掉，不要留著讓人以為它還有用。 */
+  function readSortPref() {
+    var v = S.get("hlm_sort2", null);
+    if (v === "pop" || v === "score") return v;
+    S.del("hlm_sort");
+    return "pop";
+  }
 
   /* 順序有意義：mysubs 要先算好，pf 才有東西可以拿來當預設 */
   if (!Array.isArray(state.mysubs)) state.mysubs = [];
@@ -93,14 +104,26 @@
     renderTabs(); renderPf(); renderRecent();
   }
 
-  /* ---------- 列表 ---------- */
-  function sortCinema(a) {
-    return a.slice().sort(function (x, y) {
-      if (state.sort === "pop") return (y.pop || 0) - (x.pop || 0);
-      var xs = x.tmdb == null ? -1 : x.tmdb, ys = y.tmdb == null ? -1 : y.tmdb;
-      if (ys !== xs) return ys - xs;
-      return (y.pop || 0) - (x.pop || 0);
-    });
+  /* ---------- 列表排序 ---------- */
+  /* popularity 缺值或剛好相同時，一定要有固定的第二順位（這裡用 id），
+     否則同一份片單每次重整順序都會跳動——他會覺得「怪怪的」但講不出哪裡怪。 */
+  function byPop(x, y) {
+    var d = (y.pop || 0) - (x.pop || 0);
+    return d !== 0 ? d : (x.id - y.id);
+  }
+  function byScore(x, y) {
+    var xs = x.tmdb == null ? -1 : x.tmdb, ys = y.tmdb == null ? -1 : y.tmdb;
+    if (ys !== xs) return ys - xs;
+    return byPop(x, y);
+  }
+  function sortItems(items, mode) {
+    if (state.sort === "pop") {
+      /* 串流的 discover 本來就帶 sort_by=popularity.desc → 直接用 API 的順序，
+         不要在前端再排一次（TMDB 回的 popularity 欄位跟它自己的排序不見得完全一致）。 */
+      if (mode === "stream") return items;
+      return items.slice().sort(byPop);
+    }
+    return items.slice().sort(byScore);
   }
 
   function loadList(force) {
@@ -145,8 +168,8 @@
       var items = r.v.slice();
       for (var i = 0; i < items.length; i++) items[i].inCinema = !!state.cinemaIds[items[i].id];
 
-      if (mode === "cinema") items = sortCinema(items);
-      else if (mode === "stream") items.sort(function (x, y) { return (y.tmdb || 0) - (x.tmdb || 0); });
+      /* 搜尋結果維持 TMDB 的相關度排序，不要動 */
+      if (mode !== "search") items = sortItems(items, mode);
 
       var title, hint;
       if (mode === "search") {
@@ -155,8 +178,6 @@
       } else if (mode === "cinema") {
         title = "現在電影院上映中 · " + items.length + " 部";
         hint = "列表分數是 <b>TMDB 觀眾評分</b>（10 分制）。IMDb、爛番茄、Metacritic 要點進片子才會去查。";
-        $("sortbtn").classList.remove("hide");
-        $("sortbtn").textContent = state.sort === "score" ? "依評價 ▾" : "依熱門 ▾";
       } else {
         var names = pfNames();
         title = "訂閱就能看 · " + items.length + " 部";
@@ -171,6 +192,11 @@
 
       $("listTitle").textContent = title;
       $("hintline").innerHTML = hint;
+      /* 電影院與串流都給切換鈕（搜尋結果不給，那裡照相關度排） */
+      if (mode !== "search") {
+        $("sortbtn").classList.remove("hide");
+        $("sortbtn").textContent = state.sort === "score" ? "依評價 ▾" : "依熱門 ▾";
+      }
 
       if (!items.length) {
         $("list").innerHTML = "";
@@ -444,7 +470,7 @@
 
   $("sortbtn").addEventListener("click", function () {
     state.sort = state.sort === "score" ? "pop" : "score";
-    S.set("hlm_sort", state.sort);
+    S.set("hlm_sort2", state.sort);
     loadList();
     toast(state.sort === "score" ? "改成依評價排序" : "改成依熱門排序");
   });
