@@ -1,0 +1,14 @@
+{
+  "name": "movie-library",
+  "private": true,
+  "description": "好雷嗎? — 開發用設定檔。上線的 App 是純靜態、零執行期依賴；這裡只有『跑測試』會用到的開發相依。",
+  "scripts": {
+    "test": "node test/run.mjs",
+    "test:mutate": "node test/mutate.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "jsdom": "^28.0.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "好雷嗎?",
+  "short_name": "好雷嗎",
+  "description": "一頁看完一部片值不值得看：TMDB、IMDb、爛番茄、Metacritic 分數與台灣哪裡看得到。",
+  "lang": "zh-Hant-TW",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

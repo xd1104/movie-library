@@ -1,0 +1,61 @@
+/* 好雷嗎? — 設定常數
+   ⚠️ 這個檔會被 sw.js 用 importScripts() 載入，所以裡面不可以碰 window / document。
+   ⚠️ 這裡永遠不會有 API 金鑰。金鑰只存在使用者自己裝置的 localStorage。 */
+
+/* 唯一版本來源：改版就 +1，sw.js 的快取名稱會跟著換 */
+var HLM_VER = "1.0.0";
+
+var HLM_CFG = {
+  ver: HLM_VER,
+
+  /* API 端點 */
+  tmdbBase: "https://api.themoviedb.org/3",
+  omdbBase: "https://www.omdbapi.com/",
+  imgBase: "https://image.tmdb.org/t/p/",
+  imgList: "w200",
+  imgDetail: "w400",
+  imgLogo: "w45",
+
+  region: "TW",
+  lang: "zh-TW",
+  timeoutMs: 12000,
+
+  /* 快取 TTL（毫秒） */
+  ttl: {
+    movie: 30 * 24 * 3600e3,   /* 電影基本資料 30 天 */
+    providers: 24 * 3600e3,    /* 觀看平台 1 天 */
+    omdb: 7 * 24 * 3600e3,     /* OMDb 分數 7 天 */
+    listCinema: 6 * 3600e3,    /* 電影院片單 6 小時 */
+    listStream: 6 * 3600e3,    /* 串流片單 6 小時 */
+    search: 6 * 3600e3,        /* 搜尋結果 6 小時 */
+    providerIds: 30 * 24 * 3600e3
+  },
+
+  /* 快取上限：超過就淘汰最舊的（localStorage 通常只有 5MB） */
+  cacheMaxEntries: 400,
+  cacheMaxChars: 1200000,
+
+  /* 申請金鑰的網站 */
+  urlTmdbKey: "https://www.themoviedb.org/settings/api",
+  urlOmdbKey: "https://www.omdbapi.com/apikey.aspx"
+};
+
+/* 平台字典：色塊底色與縮寫（照設計 token）。
+   TMDB provider id 是預設值，開機時會用 /watch/providers/movie 依名稱校正一次。 */
+var HLM_BRAND = {
+  netflix:   { n: "Netflix",     c: "#e50914", s: "N",   id: 8,   match: ["netflix"] },
+  disney:    { n: "Disney+",     c: "#1d4ed8", s: "D+",  id: 337, match: ["disney plus", "disney+"] },
+  prime:     { n: "Prime Video", c: "#00a8e1", s: "pv",  id: 119, match: ["amazon prime video", "prime video"] },
+  catchplay: { n: "CATCHPLAY+",  c: "#c9a200", s: "CP",  id: 159, match: ["catchplay"] },
+  friday:    { n: "friDay影音",  c: "#ff6b00", s: "fri", id: 426, match: ["friday"] },
+  myvideo:   { n: "MyVideo",     c: "#7c4dff", s: "MV",  id: 457, match: ["myvideo"] },
+  apple:     { n: "Apple TV",    c: "#8e8e93", s: "tv",  id: 2,   match: ["apple tv"] },
+  /* Apple TV+（訂閱）跟 Apple TV（租買商店）是兩回事，台灣兩個都有。
+     沒有分開的話，同一部片會出現兩顆都寫「Apple TV」的標籤。
+     ⚠️ 比對靠 api.js 的 brandKeyByName()「最長命中優先」，不是靠這裡的鍵順序。 */
+  appletvplus: { n: "Apple TV+",  c: "#8e8e93", s: "tv+", id: 350, match: ["apple tv plus", "apple tv+"] },
+  google:    { n: "Google TV",   c: "#34a853", s: "G",   id: 3,   match: ["google play movies", "google tv"] }
+};
+
+/* 篩選列只放「他可能有訂閱」的訂閱制平台（Apple TV / Google TV 在台灣主要是租買，不進篩選） */
+var HLM_FILTERABLE = ["netflix", "disney", "prime", "catchplay", "friday", "myvideo"];
