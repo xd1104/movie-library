@@ -1,4 +1,4 @@
-/* build 1.2.0 */
+/* build 1.2.1 */
 /* ⚠️ 上面那行 build 版本字串要跟 js/config.js 的 HLM_VER 一起 +1。
    兩個地方都要改是刻意的：瀏覽器判斷「SW 有沒有更新」是比對 sw.js 本身的位元組，
    只改 importScripts 進來的 config.js 有機會不觸發更新，那個症狀是「老闆永遠拿不到新版」。 */
