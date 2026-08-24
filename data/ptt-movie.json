@@ -1,11 +1,11 @@
 {
-  "updated": "2026-08-23T19:46:44Z",
+  "updated": "2026-08-24T19:56:37Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 786,
-    "tagged": 157,
-    "matched": 103,
+    "posts": 777,
+    "tagged": 155,
+    "matched": 101,
     "ambiguous": 0,
     "unmatched": 54
   },
@@ -25,7 +25,7 @@
       ]
     },
     "969681": {
-      "good": 43,
+      "good": 40,
       "ok": 14,
       "bad": 6,
       "posts": [
@@ -49,13 +49,6 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787050345.A.459.html",
           "date": "8/18",
           "push": 43
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人：重生日 漫威第一",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785300219.A.8E1.html",
-          "date": "7/29",
-          "push": 41
         },
         {
           "tag": "好雷",
@@ -84,6 +77,13 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1786726762.A.824.html",
           "date": "8/15",
           "push": 22
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 蜘蛛人：重生日",
+          "url": "https://www.ptt.cc/bbs/movie/M.1785391984.A.E33.html",
+          "date": "7/30",
+          "push": 20
         }
       ]
     },
@@ -146,7 +146,7 @@
           "title": "[普雷] 橡樹街末日",
           "url": "https://www.ptt.cc/bbs/movie/M.1787197717.A.292.html",
           "date": "8/20",
-          "push": 3
+          "push": 4
         }
       ]
     },
@@ -196,6 +196,20 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787475369.A.A84.html",
           "date": "8/23",
           "push": 3
+        }
+      ]
+    },
+    "1329016": {
+      "good": 0,
+      "ok": 0,
+      "bad": 1,
+      "posts": [
+        {
+          "tag": "負雷",
+          "title": "[負雷] 野生狂廚-莫名奇妙的角色曲線",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787583656.A.9CF.html",
+          "date": "8/24",
+          "push": 1
         }
       ]
     },
