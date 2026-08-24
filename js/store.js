@@ -183,6 +183,9 @@ var HLM_Store = (function () {
     return true;
   }
   function keysFromKeyring() { return get("hlm_keys_src", "") === "keyring"; }
+  /* 他自己貼的金鑰（不是鑰匙圈給的）。v1.3.0 起：**手貼的永遠優先**，
+     鑰匙圈的公開值不可以蓋掉它——那是他在逃生門特地貼進去的東西。 */
+  function keysManual() { return !!keys().tmdb && !keysFromKeyring(); }
 
   /* 鑰匙圈解出來的原始 blob：{raw, remember}；沒有就 null。
      在 sessionStorage ＝ 沒勾「記住這台裝置」（跟模組的 writeToken 同一套規則）。 */
@@ -201,6 +204,6 @@ var HLM_Store = (function () {
     cacheClear: cacheClear, cacheStats: cacheStats, sweep: sweep,
     keys: keys, saveKeys: saveKeys,
     rawGet: rawGet, keyringBlob: keyringBlob, saveKeysFromKeyring: saveKeysFromKeyring,
-    clearKeyringKeys: clearKeyringKeys, keysFromKeyring: keysFromKeyring
+    clearKeyringKeys: clearKeyringKeys, keysFromKeyring: keysFromKeyring, keysManual: keysManual
   };
 })();

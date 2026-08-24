@@ -4,7 +4,9 @@ import { KEYS } from "./mock-api.mjs";
 section("25. 老闆第一次開 App 的完整路徑（從零到查到一部片）");
 {
   const { w, d, calls } = await boot();                       // 全新、沒有任何金鑰
-  ok(d.getElementById("view-setup").classList.contains("on"), "① 開起來直接是設定頁");
+  await tick(w, 120);
+  /* v1.3.0：沒有「第一次要設定金鑰」那一頁；拿不到金鑰就在首頁給逃生門 */
+  ok(/現在還不能查片/.test(html(d, "emptyBox")), "① 開起來就在首頁，並說明現在還不能查片");
   ok(calls.list.length === 0, "還沒有 key 就不會亂打 API（0 次呼叫）");
 
   $(d, "ktmdb").value = KEYS.GOOD_TMDB;

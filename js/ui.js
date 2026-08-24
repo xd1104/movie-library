@@ -529,73 +529,71 @@ var HLM_UI = (function () {
     }).join("");
   }
 
-  /* 鑰匙圈那一張卡。⚠️ 兩條路要並存：鑰匙圈解不開（忘記密碼／被收回／離線）時，
-     手貼金鑰那條路一定要還在，不可以讓 App 變成完全不能用。
-     ⚠️ 不可以在這裡寫任何 kr- 的樣式或自己畫解鎖畫面——那是跨 App 公版，模組自己帶。 */
-  function keyringCard(k, firstRun) {
-    if (!k.krOn) return "";
-    var err = k.krErr
-      ? '<div class="warn"><span class="warnmark">!</span><span><b>' + esc(k.krErr.t) + "</b><br>" + esc(k.krErr.b) + "</span></div>"
-      : "";
-    /* 三種狀態，不是兩種。
-       ⚠️ 「解鎖了」不等於「金鑰進來了」——後台那一格還沒填就先解鎖，
-       是老闆很可能遇到的**第一個**狀態。這時候還說「下面那兩格會自動填好」就是騙人。 */
-    var body;
-    if (k.krUnlocked && k.tmdb) {
-      body = '<p class="sub" style="margin:0 0 12px">這台裝置已經解鎖，金鑰是鑰匙圈帶進來的。下面那兩格會自動填好，平常不用動。</p>';
-    } else if (k.krUnlocked) {
-      body = '<div class="warn"><span class="warnmark">!</span><span>' +
-        "<b>鑰匙圈解開了，但裡面還沒放這個 App 的金鑰。</b><br>" +
-        "去鑰匙圈後台，在「好雷嗎」那一格貼上這樣一整行：<br>" +
-        esc('{"tmdb":"你的 TMDB 金鑰","omdb":"你的 OMDb 金鑰"}') + "<br>" +
-        "（代號要填 <b>movie-library</b>）。存檔之後回到這裡重開一次就會自動填好。<br>" +
-        "不想現在弄的話，往下自己貼一樣能用。</span></div>";
-    } else {
-      body = '<p class="sub" style="margin:0 0 12px">' + (firstRun
-        ? "如果你已經把金鑰放進鑰匙圈了，<b>解鎖一次就好，不用手貼</b>。"
-        : "解鎖之後金鑰會自動填進來。") + "沒有鑰匙圈也沒關係，往下自己貼一樣能用。</p>";
-    }
-    return '<div class="card step"><h3>' + (firstRun ? '<span class="n">0</span>' : "") + "用鑰匙圈（最快）</h3>" +
-      body + err + '<div id="krslot2"></div></div>';
-  }
-
-  function setupHTML(k, firstRun) {
-    return '<div class="setup">' +
-      "<h2>" + (firstRun ? "先設定一次，之後就不用了" : "設定") + "</h2>" +
-      '<p class="lead">' + (firstRun
-        ? "「好雷嗎?」自己沒有電影資料庫，是去 TMDB 和 OMDb 幫你查。<br>這兩個網站都免費，但要用<b>你自己的金鑰</b>。申請大概 5 分鐘，<b>只要做這一次</b>。<br>金鑰只存在這支手機裡，不會傳給任何人。"
-        : "金鑰只存在這支手機的瀏覽器裡，不會上傳、也不在程式碼裡。") + "</p>" +
-
-      keyringCard(k, firstRun) +
-
-      '<div class="card step"><h3><span class="n">1</span>TMDB 金鑰（必要）</h3>' +
+  /* ---------- 手貼金鑰（逃生門） ----------
+     ⚠️ v1.3.0 起這不是平常會看到的畫面：金鑰是鑰匙圈公開值自動帶進來的。
+     這一段只在「拿不到金鑰」時出現，讓他不會被鎖在門外。
+     ⚠️ 這支跟整個 ui.js 一樣**完全不碰 Keyring**（只吃布林值與字串）——
+     模組壞掉時連錯誤畫面都畫不出來的話，那才是真的鎖死（QA 2026-08-23 的教訓）。 */
+  function keyFormHTML(k) {
+    return '<div class="card step"><h3>自己貼金鑰</h3>' +
+      '<p class="sub" style="margin:0 0 12px">你貼的會<b>優先於</b>鑰匙圈的值，存在這台裝置上。</p>' +
       "<ol>" +
-      '<li>開 <a class="linkbtn" href="' + C.urlTmdbKey + '" target="_blank" rel="noopener">themoviedb.org 的 API 設定頁</a>（要先註冊一個免費帳號）</li>' +
-      "<li>申請類型選 <b>Developer</b>，用途隨便填（例如 personal use）</li>" +
-      "<li>核准後那一頁會出現 <b>API Key (v3 auth)</b>，那一長串就是</li>" +
-      "<li>⚠️ 不要拿 <b>API Read Access Token</b>（開頭 eyJ… 那個很長的），這個 App 用的是 v3 的那組短的</li>" +
+      '<li>TMDB：開 <a class="linkbtn" href="' + C.urlTmdbKey + '" target="_blank" rel="noopener">themoviedb.org 的 API 設定頁</a>，' +
+      "拿 <b>API Key (v3 auth)</b>（不要 <b>API Read Access Token</b>，開頭 eyJ… 那個長的）</li>" +
+      '<li>OMDb（選填）：開 <a class="linkbtn" href="' + C.urlOmdbKey + '" target="_blank" rel="noopener">omdbapi.com 的申請頁</a>，' +
+      "選 <b>FREE!（1,000 daily limit）</b>；<b>信裡的啟用連結一定要點下去</b>，沒點的金鑰是死的</li>" +
       "</ol>" +
       '<div class="field"><label for="ktmdb">TMDB API Key (v3 auth)</label>' +
       '<input id="ktmdb" type="text" inputmode="latin" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="貼上 32 碼英數字" value="' + esc(k.tmdb) + '">' +
-      '<p class="sub">沒有這個，App 什麼都查不到。</p></div></div>' +
-
-      '<div class="card step"><h3><span class="n">2</span>OMDb 金鑰（選用，但建議）</h3>' +
-      "<ol>" +
-      '<li>開 <a class="linkbtn" href="' + C.urlOmdbKey + '" target="_blank" rel="noopener">omdbapi.com 的申請頁</a></li>' +
-      "<li>選 <b>FREE!（1,000 daily limit）</b>，填 email 送出</li>" +
-      "<li>信箱會收到金鑰（8 碼）</li>" +
-      "</ol>" +
-      '<div class="warn"><span class="warnmark">!</span><span><b>那封信裡還有一個啟用連結，一定要點下去。</b>沒點的話金鑰是死的，貼進來也會顯示無效——這是最多人卡住的地方。</span></div>' +
+      '<p class="sub">沒有這個，App 什麼都查不到。</p></div>' +
       '<div class="field"><label for="komdb">OMDb API Key</label>' +
       '<input id="komdb" type="text" inputmode="latin" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="貼上 8 碼金鑰（可以先空著）" value="' + esc(k.omdb) + '">' +
-      '<p class="sub">沒填也能用，只是詳細頁看不到 IMDb、爛番茄、Metacritic 三個分數。</p></div></div>' +
-
-      '<div class="card step"><h3><span class="n">3</span>存起來並測試</h3>' +
+      '<p class="sub">沒填也能用，只是詳細頁看不到 IMDb、爛番茄、Metacritic 三個分數。</p></div>' +
       '<div class="acts">' +
       '<button class="btn pri wide" type="button" id="saveTest">儲存並測試連線</button>' +
       '<button class="btn wide" type="button" id="justSave">只儲存</button>' +
+      "</div><div id=\"testout\"></div></div>";
+  }
+
+  /**
+   * 拿不到金鑰時的畫面（首頁片單區）。
+   * ctx = { loading, why, hasModule, lsBroken }  ← **只有布林值與字串，不碰任何模組**
+   */
+  function keyErrorHTML(k, ctx) {
+    ctx = ctx || {};
+    if (ctx.loading) {
+      return '<div class="empty"><h3>正在拿金鑰…</h3>' +
+        "<p>第一次打開要跟鑰匙圈拿一次，通常一秒內就好。</p></div>";
+    }
+    var why = ctx.why || "拿不到鑰匙圈上的金鑰。";
+    return '<div style="padding:0 16px">' +
+      '<div class="errbox hard"><h3>現在還不能查片</h3>' +
+      "<p>" + esc(why) + "</p>" +
+      (ctx.hasModule ? '<div class="acts" style="margin-top:12px">' +
+        '<button class="btn wide" type="button" id="krretry">再試一次</button></div>' : "") +
       "</div>" +
-      '<div id="testout"></div></div>' +
+      (ctx.lsBroken ? '<div class="errbox hard"><h3>這個瀏覽器不讓我存資料</h3>' +
+        "<p>可能是無痕模式或隱私設定。金鑰跟快取只會活到這個分頁關掉為止，每次開都要重貼。用一般（非無痕）視窗開就好。</p></div>" : "") +
+      keyFormHTML(k) + "</div>";
+  }
+
+  function setupHTML(k, firstRun) {
+    /* v1.3.0：金鑰由鑰匙圈的公開值自動帶進來，**設定頁不再有手貼金鑰的表單**。
+       手貼是逃生門（見 keyErrorHTML），只有在拿不到金鑰時才出現。
+       這裡只在「他真的手貼過」時顯示一行狀態＋清掉，免得他想換卻找不到地方。 */
+    return '<div class="setup">' +
+      "<h2>設定</h2>" +
+      '<p class="lead">金鑰是從鑰匙圈自動拿的，平常不用管它。</p>' +
+
+      '<div class="card step"><h3>金鑰</h3>' +
+      (k.manual
+        ? '<p class="sub" style="margin:0 0 12px">目前用的是<b>你自己貼的</b>金鑰（優先於鑰匙圈）：TMDB ' +
+          esc(k.tmdbMask) + (k.omdb ? "、OMDb " + esc(k.omdbMask) : "、沒有 OMDb") + "</p>" +
+          '<button class="btn wide" type="button" id="mkclear">清掉我貼的，改用鑰匙圈的</button>'
+        : '<p class="sub" style="margin:0">' + (k.tmdb
+            ? "來自鑰匙圈的公開設定，這個 App 不需要登入。"
+            : "現在拿不到金鑰。回上一頁會看到怎麼處理。") + "</p>") +
+      "</div>" +
 
       '<div class="card step"><h3>我訂了哪些平台</h3>' +
       '<p class="sub" style="margin:0 0 12px">勾起來之後，「串流」分頁預設就只看這些平台。之後在片單上臨時改篩選，不會動到這裡。</p>' +
@@ -624,6 +622,7 @@ var HLM_UI = (function () {
     pttHTML: pttHTML, pttVerdict: pttVerdict, pttSegs: pttSegs, pttPicks: pttPicks,
     pttTitle: pttTitle, pttStamp: pttStamp, pttStaleDays: pttStaleDays,
     setupHTML: setupHTML, testRow: testRow, mysubsChips: mysubsChips,
+    keyFormHTML: keyFormHTML, keyErrorHTML: keyErrorHTML,
     fmtDateLong: fmtDateLong, fmtMD: fmtMD, daysSinceRelease: daysSinceRelease
   };
 })();

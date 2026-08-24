@@ -1,26 +1,32 @@
 import { boot, tick, $, txt, html, ok, section, summary } from "./harness.mjs";
 import { KEYS } from "./mock-api.mjs";
 
-section("1. 第一次使用：沒有金鑰");
+section("1. 第一次使用：拿不到金鑰時的逃生門（v1.3.0 起沒有「設定金鑰」那一頁）");
 {
+  /* v1.3.0：金鑰是鑰匙圈的公開值自動帶進來的，所以**沒有第一次使用的引導頁**。
+     真的拿不到金鑰時，首頁片單區會出現「現在還不能查片」＋手貼逃生門。
+     那些申請金鑰的說明沒有消失，它們搬到逃生門裡了——因為會走到那裡的人正是需要它們的人。 */
   const { w, d } = await boot();
-  ok(d.getElementById("view-setup").classList.contains("on"), "沒金鑰 → 開機直接進設定頁（不用等他搜尋才報錯）");
-  const h = html(d, "sbody");
-  ok(/先設定一次/.test(h), "標題是「先設定一次，之後就不用了」");
+  await tick(w, 120);
+  ok(!d.getElementById("view-setup").classList.contains("on"), "★ 沒金鑰**不會**再被丟到設定頁");
+  ok(d.getElementById("view-home").style.display !== "none", "★ 停在首頁");
+  const h = html(d, "emptyBox");
+  ok(/現在還不能查片/.test(h), "★ 首頁直接說「現在還不能查片」", h.slice(0, 120));
+  ok(/自己貼金鑰/.test(h), "★ 而且當場給手貼金鑰的逃生門（不會被鎖在門外）");
   ok(/API Key \(v3 auth\)/.test(h), "有講清楚要 TMDB 的 API Key v3 auth");
   ok(/eyJ/.test(h), "有提醒別拿 Read Access Token");
   ok(/FREE.*1,000 daily limit/.test(h), "有講 OMDb 要選 FREE 1000/day");
-  ok(/啟用連結，一定要點下去/.test(h), "有明講 OMDb 啟用信一定要點");
+  ok(/啟用連結一定要點下去/.test(h), "有明講 OMDb 啟用信一定要點");
   ok(/themoviedb\.org\/settings\/api/.test(h) && /omdbapi\.com\/apikey/.test(h), "兩個申請網址都給了");
-  ok(!/訂票|去 Netflix|立即觀看/.test(h), "設定頁沒有任何導購字眼");
-  ok(w.location.hash === "#/setup", "hash 換成 #/setup");
-  const inputs = [...d.querySelectorAll("input")];
-  ok(inputs.length >= 3, "有輸入框");
+  ok(!/訂票|去 Netflix|立即觀看/.test(h), "逃生門沒有任何導購字眼");
+  ok(w.location.hash !== "#/setup", "★ 不再把 hash 換成 #/setup");
+  ok(!!d.getElementById("ktmdb") && !!d.getElementById("komdb"), "兩個輸入框都在");
 }
 
-section("2. 測試連線：三條路徑（沒 key／key 錯／key 對）");
+section("2. 測試連線：三條路徑（沒 key／key 錯／key 對）— 現在在逃生門上");
 {
   const { w, d } = await boot();
+  await tick(w, 120);
   // 沒填
   $(d, "saveTest").click(); await tick(w, 40);
   let o = html(d, "testout");

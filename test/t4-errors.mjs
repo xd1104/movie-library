@@ -78,13 +78,13 @@ section("16. 離線降級：有舊快取就先給舊的，並說明");
 section("17. localStorage 被封鎖（無痕模式）不可以白畫面");
 {
   const { w, d } = await boot({ store: ST, breakLS: true });
-  await tick(w, 80);
-  ok(d.getElementById("view-setup").classList.contains("on"), "讀不到金鑰 → 退回設定頁（不是白畫面、不是崩潰）");
-  ok(/這個瀏覽器不讓我存資料/.test(html(d, "sbody")), "明講原因與解法（用一般視窗開）");
+  await tick(w, 150);
+  /* v1.3.0：沒有設定頁那條路了，逃生門在首頁的片單區 */
+  ok(/現在還不能查片/.test(html(d, "emptyBox")), "讀不到金鑰 → 首頁給逃生門（不是白畫面、不是崩潰）");
+  ok(/這個瀏覽器不讓我存資料/.test(html(d, "emptyBox")), "明講原因與解法（用一般視窗開）");
   // 當場貼金鑰，這個 session 內仍要能用
   $(d, "ktmdb").value = KEYS.GOOD_TMDB;
-  $(d, "justSave").click();
-  $(d, "sback").click(); await tick(w, 100);
+  $(d, "justSave").click(); await tick(w, 150);
   ok(d.querySelectorAll(".row[data-open]").length === 6, "當場貼金鑰後，這個 session 照樣查得到片（存在記憶體）");
 }
 

@@ -168,17 +168,19 @@ const M = [
   ["K07 setupKeyring 沒有 try/catch（模組丟例外就整支停掉）", "js/app.js", `  try { setupKeyring(); } catch (e) { }
   boot();`, `  setupKeyring();
   boot();`],
-  ["K08 首頁不呼叫 maybeIntro", "js/app.js", `    if (krOn()) krTry(function () { Keyring.maybeIntro(); });
-`, ``],
+  ["K08 又把自動彈解鎖加回來（公開模式不該有登入畫面）", "js/app.js", `    $("gear").classList.toggle("warn", !hasTmdbKey());
+    window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);`, `    $("gear").classList.toggle("warn", !hasTmdbKey());
+    if (krOn()) krTry(function () { Keyring.maybeIntro(); });
+    window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);`],
   ["K10 index.html 沒載入鑰匙圈模組", "index.html", `<script src="./js/keyring-unlock.js"></script>
 `, ``],
   ["K11 鑰匙圈模組沒進 sw.js 殼快取", "sw.js", `  "./js/keyring-unlock.js",
 `, ``],
   /* ---- 模組存取點的守衛（QA 2026-08-23 退件 K-1：包 try/catch ≠ 包對地方）---- */
   ["G1 krOn() 沒有守衛（讀 window.Keyring 就爆時整支停掉）", "js/app.js", `    return krTry(function () { return !!(window.Keyring && typeof window.Keyring.init === "function"); }, false);`, `    return !!(window.Keyring && typeof window.Keyring.init === "function");`],
-  ["G2 isUnlocked() 沒有守衛（K-1 本尊：設定頁畫不出來）", "js/app.js", `    k.krUnlocked = krOn() && krTry(function () { return !!Keyring.isUnlocked(); }, false);`, `    k.krUnlocked = krOn() && Keyring.isUnlocked();`],
-  ["G3 chipHtml() 沒有守衛", "js/app.js", `      if (el) el.innerHTML = krTry(function () { return String(Keyring.chipHtml() || ""); }, "");`, `      if (el) el.innerHTML = Keyring.chipHtml();`],
-  ["G4 maybeIntro() 沒有守衛", "js/app.js", `    if (krOn()) krTry(function () { Keyring.maybeIntro(); });`, `    if (krOn()) Keyring.maybeIntro();`],
+  ["G2 whenReady() 沒有守衛（開機那條路上會卡在「正在拿金鑰…」）", "js/app.js", `    var p = krTry(function () { return Keyring.whenReady(); }, null);`, `    var p = Keyring.whenReady();`],
+  ["G3 重試裡的 whenReady() 沒有守衛", "js/app.js", `      var pr = krTry(function () { return Keyring.whenReady(); }, null);`, `      var pr = Keyring.whenReady();`],
+  ["G4 reload() 沒有守衛", "js/app.js", `      krTry(function () { return Keyring.reload(); }, null);`, `      Keyring.reload();`],
   /* ---- 兩種金鑰來源交錯 ---- */
   ["N10 手貼時沒把來源記號改回來（下次收回會清掉他手貼的）", "js/store.js", `    del("hlm_keys_src");                       /* 手貼的就不算是鑰匙圈給的 */
 `, ``],
@@ -189,7 +191,25 @@ const M = [
       omdb: String(get("hlm_key_omdb", "") || ssGet("hlm_key_omdb") || "").trim()`],
   ["N15 手貼時沒清掉 session 的舊副本（新金鑰被舊的蓋住）", "js/store.js", `    ssDel("hlm_key_tmdb"); ssDel("hlm_key_omdb");
     set("hlm_key_tmdb", String(t || "").trim());`, `    set("hlm_key_tmdb", String(t || "").trim());`],
-  ["N31 有鑰匙圈時「儲存並測試」鈕消失（手貼那條路斷掉）", "js/ui.js", `      '<button class="btn pri wide" type="button" id="saveTest">儲存並測試連線</button>' +`, `      (k.krOn ? "" : '<button class="btn pri wide" type="button" id="saveTest">儲存並測試連線</button>') +`],
+  ["N31 逃生門的「儲存並測試」鈕不見了（手貼那條路斷掉）", "js/ui.js", `      '<button class="btn pri wide" type="button" id="saveTest">儲存並測試連線</button>' +`, ``],
+  /* ---- v1.3.0 公開模式：沒有登入畫面，但逃生門要留著 ---- */
+  ["P1 公開值蓋掉他手貼的金鑰", "js/app.js", `    if (krTry(function () { return S.keysManual(); }, false)) return false;
+`, ``],
+  ["P2 沒金鑰時又把人丟回設定頁（v1.3.0 已經沒有那一頁了）", "js/app.js", `    if (!hasTmdbKey()) {
+      showHome(false);
+      loadList();
+      return;
+    }`, `    if (!hasTmdbKey()) {
+      renderSetup(true);
+      return;
+    }`],
+  ["P3 拿不到金鑰時不給手貼逃生門", "js/ui.js", `      keyFormHTML(k) + "</div>";`, `      "</div>";`],
+  ["P4 錯誤畫面自己去問模組（模組壞掉就連錯誤畫面都出不來）", "js/ui.js", `  function keyErrorHTML(k, ctx) {
+    ctx = ctx || {};`, `  function keyErrorHTML(k, ctx) {
+    ctx = ctx || {};
+    ctx.hasModule = !!(window.Keyring && Keyring.isPublic());`],
+  ["P5 逃生門存完金鑰不重畫片單（他會卡在錯誤畫面）", "js/app.js", `      if (state.view === "home" && hasTmdbKey()) afterSetup();
+`, ``],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

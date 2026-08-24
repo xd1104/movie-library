@@ -185,7 +185,12 @@ section("B-1.2 設定頁勾「我訂了哪些平台」→ 串流分頁預設就�
   d.querySelector('[data-sub="netflix"]').click(); await tick(w, 30);
   ok(JSON.parse(w.localStorage.getItem("hlm_mysubs")).join() === "netflix", "勾了會存起來");
   ok(/pf on[^>]*data-sub="netflix"|data-sub="netflix"/.test(html(d, "mysubs")) && /class="pf on"/.test(html(d, "mysubs")), "勾起來的 chip 有反白");
-  ok($(d, "ktmdb").value === KEYS.GOOD_TMDB, "★ 勾平台不會把他打到一半的金鑰洗掉（只重畫那一區）");
+  /* v1.3.0：設定頁沒有金鑰輸入框了（金鑰來自鑰匙圈）。同一件事改用「只重畫那一區」本身來驗：
+     整頁重畫的話，這個標記元素會不見。 */
+  $(d, "sbody").insertAdjacentHTML("beforeend", '<span id="__probe__"></span>');
+  d.querySelector('[data-sub="disney"]').click(); await tick(w, 30);
+  ok(!!$(d, "__probe__"), "★ 勾平台只重畫那一區，不會把整個設定頁重畫掉");
+  d.querySelector('[data-sub="disney"]').click(); await tick(w, 30);
 
   $(d, "sback").click(); await tick(w, 150);
   d.querySelector('[data-tab="stream"]').click(); await tick(w, 150);

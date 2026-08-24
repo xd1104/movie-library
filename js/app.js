@@ -65,6 +65,12 @@
   }
 
   function hasTmdbKey() { return !!S.keys().tmdb; }
+  /* 設定頁上顯示「你貼的那把」用的遮罩（不要把整串印在畫面上） */
+  function maskKey(v) {
+    var t = String(v || "");
+    if (!t) return "";
+    return t.length <= 8 ? "••••••••" : t.slice(0, 4) + "••••••••" + t.slice(-2);
+  }
 
   /* ---------- 首頁渲染 ---------- */
   function renderTabs() {
@@ -135,9 +141,13 @@
     $("sortbtn").classList.add("hide");
 
     if (!hasTmdbKey()) {
+      /* 拿不到金鑰＝這個 App 現在不能用。這裡是**唯一**的逃生門：
+         說清楚怎麼了 ＋ 讓他自己貼金鑰。畫面由 ui.js 產生，完全不碰鑰匙圈模組。 */
       $("listTitle").textContent = "";
       $("list").innerHTML = "";
-      $("emptyBox").innerHTML = UI.errorBox(Api.err("nokey", "tmdb"));
+      $("sortbtn").classList.add("hide");
+      var kk = S.keys();
+      $("emptyBox").innerHTML = UI.keyErrorHTML(kk, krErrCtx());
       return;
     }
 
@@ -257,21 +267,29 @@
     for (var c = 0; c < 3; c++) next();
   }
 
-  /* ---------- 鑰匙圈（跨 App 身分） ----------
-     它幫我們做的事只有一件：把後台那一格解密出來、寫進 C.krBlobKey。
-     「一個條目要裝兩把金鑰」是我們自己的事——所以那一格存的是 JSON blob，
-     解析與寫進 hlm_key_tmdb／hlm_key_omdb 都在這裡做。
-     ⚠️ 三條界線：
-     ① 鑰匙圈壞掉／沒載到，App 一定要照常能用（手貼那條路永遠留著）→ 全部包 try/catch。
-     ② 解不開／被收回 → 只清「鑰匙圈給的」金鑰，他自己手貼的不可以動。
-     ③ 不要在我們的 CSS 裡寫任何 kr- 規則（解鎖畫面是跨 App 公版，模組自己帶樣式）。 */
-  var krErr = null;         /* blob 格式不對時記下來，設定頁要顯示人話 */
+  /* ---------- 鑰匙圈（v1.3.0：公開模式，沒有登入畫面） ----------
+     這個 App 用的是 TMDB／OMDb 的免費查詢金鑰，不是憑證，所以鑰匙圈那邊把它標成
+     **公開**：值以明文放在 keyring.json 的 apps[]（public:true ＋ plain），
+     不綁使用者、不需要密碼。模組拿到之後直接寫進 C.krBlobKey，我們再拆成兩把。
+     → 使用者看到的是：**打開網址就能用**，沒有解鎖畫面、沒有設定金鑰那一頁。
+
+     ⚠️ 四條界線：
+     ① 鑰匙圈壞掉／沒載到／抓不到 → **一定要留一條手貼金鑰的路**（首頁的逃生門），
+        而且那個畫面的產生**完全不碰模組**（ui.js 只吃布林值），
+        否則模組壞掉時連錯誤畫面都出不來＝真的被鎖在門外。
+     ② 手貼的金鑰**優先於**公開值（他特地貼的最大），公開值不可以蓋掉它。
+     ③ 存取模組的每一個點都包 krTry（版本落差會同步擲出，見下面那段）。
+     ④ 不要在我們的 CSS 裡寫任何 kr- 規則（那是跨 App 公版，模組自己帶樣式）。 */
+  var krErr = null;         /* blob 格式不對時記下來，逃生門要顯示人話 */
+  /* 給逃生門畫面用的狀態。**只有布林值與字串**：它會被丟給 ui.js，而 ui.js 不准碰模組。 */
+  var krState = { loading: false, tried: false, why: "" };
 
   /* ⚠️ 存取這個模組的**每一個點**都要包起來，而且要連「讀屬性」本身一起包。
      它是跨 App 公版的複製品：**正本改了 API、我們這份沒跟上（版本落差）**，
      是共用模組最常見的退化方式，症狀是同步擲出 → 整支 app.js 停掉 → 連手貼金鑰的逃生門都不見。
      判準不是「我有沒有包 try/catch」，而是「**boot() 這條路上總共碰了模組幾次**」：
-     `grep -rn "Keyring\." js/*.js` 目前是 5 個存取點，t13 §55 用樁把每一個各打壞四種。
+     `grep -rn "Keyring\." js/*.js` 目前是 **3 個存取點**（init／whenReady／reload），
+       t13 §55 用樁把每一個各打壞四種（模組整支不見、少這個方法、方法一叫就爆、連讀屬性都爆）。
      （唯一不走 krTry 的是 Keyring.init，它的守衛是啟動那段的 try/catch——
        兩層都包的話那層就變成沒人守得住的死碼，K07 也會失去意義。） */
   function krTry(fn, fallback) {
@@ -283,6 +301,8 @@
 
   /* 把鑰匙圈解出來的 blob 拆成兩把金鑰。回傳金鑰有沒有變。 */
   function krApply(loud) {
+    /* ⭐ 他自己貼過金鑰就到此為止：手貼的優先，鑰匙圈的公開值不可以蓋掉它。 */
+    if (krTry(function () { return S.keysManual(); }, false)) return false;
     var b = null;
     try { b = S.keyringBlob(); } catch (e) { b = null; }
     if (!b) return false;
@@ -300,35 +320,30 @@
     return true;
   }
 
-  /* 身分藥丸：模組自己產生 HTML，我們只負責給位置與重畫 */
-  function krPaintChip() {
-    if (!krOn()) return;
-    var slots = ["krslot", "krslot2"], i, el;
-    for (i = 0; i < slots.length; i++) {
-      el = $(slots[i]);
-      if (el) el.innerHTML = krTry(function () { return String(Keyring.chipHtml() || ""); }, "");
-    }
-  }
+  /* ⛔ v1.3.0 起這個 App **完全沒有登入 UI**：
+     不畫身分藥丸（chipHtml）、不自動彈解鎖（maybeIntro）、設定頁也沒有解鎖入口。
+     公開模式本來就沒有身分可言；而在「後台還沒設成公開」的過渡期，
+     使用者看到的是逃生門那句人話（去後台設公開，或自己貼金鑰），不是一個解不開的登入框。
+     → 少兩個存取點 ＝ 模組壞掉時少兩條會炸的路。 */
 
-  /* 解鎖／換人／換金鑰／被收回都會走這裡 */
+  /* 鑰匙圈那邊有動靜（公開值到了／換了／被關掉）都走這裡 */
   function krChanged(st) {
     var had = hasTmdbKey();
     var changed = (st && st.unlocked) ? krApply(true) : S.clearKeyringKeys();
     $("gear").classList.toggle("warn", !hasTmdbKey());
-    krPaintChip();
     if (!changed) return;
-    if (hasTmdbKey() && !had) toast("鑰匙圈已解鎖，金鑰帶進來了");
-    if (state.view === "setup") {
-      /* 本來卡在「還不能用」的引導畫面 → 現在有金鑰了，直接把他送去片單 */
-      if (!had && hasTmdbKey()) { showHome(false); afterSetup(); return; }
-      renderSetup(!hasTmdbKey());
+    if (hasTmdbKey() && !had) {
+      /* 從「還不能查」變成「可以查」：直接把片單補上，不要讓他自己按重試 */
+      if (state.view === "setup") { showHome(false); afterSetup(); return; }
+      afterSetup();
       return;
     }
+    if (state.view === "setup") { renderSetup(false); return; }
     if (state.view === "home") loadList();
   }
 
   function setupKeyring() {
-    if (!krOn()) return;
+    if (!krOn()) { krState.tried = true; krState.why = "這台裝置沒有載到鑰匙圈模組（js/keyring-unlock.js）。"; return; }
     Keyring.init({
       appId: C.krAppId,          /* ASCII，跟 repo 同名（鑰匙圈的 id 鐵律） */
       appName: C.krAppName,
@@ -336,9 +351,35 @@
       toast: toast,
       onChange: krChanged
     });
-    /* init() 已經把記住的內容同步寫回 krBlobKey，所以這裡拆一次，
-       boot() 的自我體檢才看得到金鑰（順序不能反）。第一次進站沒解過鎖就什麼都不會發生。 */
+    /* init() 會把**上次抓到的公開值**同步寫回 krBlobKey，所以這裡先拆一次：
+       第二次之後打開就是「立刻有金鑰」，連等都不用等（順序不能反，boot() 馬上要用）。 */
     krApply(false);
+    /* 第一次進站（或後台換了值）要等網路那一趟。whenReady 不管成功失敗都會回來。 */
+    krState.loading = !hasTmdbKey();
+    var done = function () {
+      krState.loading = false;
+      krState.tried = true;
+      krApply(false);
+      if (!hasTmdbKey()) {
+        krState.why = krErr
+          ? Api.human(krErr).t + "：" + Api.human(krErr).b
+          : "鑰匙圈上找不到這個 App 的公開金鑰（後台可能還沒把它設成公開），或是現在連不上網路。";
+      }
+      $("gear").classList.toggle("warn", !hasTmdbKey());
+      if (state.view === "home") { if (hasTmdbKey()) afterSetup(); else loadList(); }
+    };
+    var p = krTry(function () { return Keyring.whenReady(); }, null);
+    if (p && typeof p.then === "function") p.then(done, done); else done();
+  }
+
+  /* 逃生門畫面要的東西。⚠️ 只有布林值與字串，ui.js 不會、也不准去問模組任何事。 */
+  function krErrCtx() {
+    return {
+      loading: !!krState.loading,
+      why: krState.why,
+      hasModule: krOn(),
+      lsBroken: !S.lsOK
+    };
   }
 
   /* ---------- PTT 鄉民風向 ----------
@@ -493,11 +534,12 @@
     window.scrollTo(0, 0);
     var k = S.keys();
     k.mysubs = state.mysubs;
-    k.krOn = krOn();
-    k.krUnlocked = krOn() && krTry(function () { return !!Keyring.isUnlocked(); }, false);
-    k.krErr = krErr ? Api.human(krErr) : null;
+    /* 設定頁不再有手貼表單；只在他真的手貼過時顯示一行狀態＋清掉（見 ui.setupHTML）。
+       ⚠️ 這裡照樣只丟布林值與字串給 ui.js。 */
+    k.manual = krTry(function () { return S.keysManual(); }, false);
+    k.tmdbMask = maskKey(k.tmdb);
+    k.omdbMask = maskKey(k.omdb);
     $("sbody").innerHTML = UI.setupHTML(k, firstRun);
-    krPaintChip();
     var st = S.cacheStats();
     $("cachestat").textContent = "目前存了 " + st.n + " 筆資料（約 " + st.kb + " KB）。清掉之後下次會重新跟 TMDB 要，額度也會多用一點。";
     if (!S.lsOK) {
@@ -537,9 +579,6 @@
     $("view-setup").classList.remove("on");
     $("view-home").style.display = "block";
     $("gear").classList.toggle("warn", !hasTmdbKey());
-    krPaintChip();
-    /* 第一次進站主動端一次解鎖畫面（之後永遠不再自動彈，模組自己記） */
-    if (krOn()) krTry(function () { Keyring.maybeIntro(); });
     window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);
   }
 
@@ -674,7 +713,11 @@
         /* 詳細頁上的重試要重抓那部片，不是重抓片單 */
         if (state.view === "detail" && curId) openDetail(curId, true); else loadList(true);
       }
-      else if (a === "home") { navBack(); afterSetup(); }
+      else if (a === "home") {
+        /* 逃生門就在首頁上，這時候沒有「上一頁」可以退——直接把片單補上就好 */
+        if (state.view !== "home") navBack();
+        afterSetup();
+      }
       return;
     }
     if (t.closest("#back2")) { navBack(); return; }
@@ -700,6 +743,31 @@
       S.saveKeys($("ktmdb").value.trim(), $("komdb").value.trim());
       $("gear").classList.toggle("warn", !hasTmdbKey());
       toast("金鑰已存在這台裝置");
+      /* 逃生門在首頁上：存完就直接把片單補上，不要讓他自己想辦法離開這個畫面 */
+      if (state.view === "home" && hasTmdbKey()) afterSetup();
+      return;
+    }
+    if (t.closest("#krretry")) {
+      krState.loading = true; krState.why = "";
+      loadList();
+      krTry(function () { return Keyring.reload(); }, null);
+      var again = function () { krState.loading = false; krState.tried = true; krApply(false);
+        if (hasTmdbKey()) { toast("拿到金鑰了"); afterSetup(); } else {
+          krState.why = "還是拿不到。可能是鑰匙圈那邊還沒把這個 App 設成公開，或是現在連不上網路。";
+          loadList();
+        } };
+      var pr = krTry(function () { return Keyring.whenReady(); }, null);
+      if (pr && typeof pr.then === "function") setTimeout(function () { pr.then(again, again); }, 250);
+      else setTimeout(again, 250);
+      return;
+    }
+    if (t.closest("#mkclear")) {
+      S.saveKeys("", "");
+      S.del("hlm_keys_src");
+      krApply(false);
+      renderSetup(false);
+      $("gear").classList.toggle("warn", !hasTmdbKey());
+      toast(hasTmdbKey() ? "清掉了，改用鑰匙圈的金鑰" : "清掉了");
       return;
     }
     if (t.closest("#clearCache")) {
@@ -735,9 +803,12 @@
     renderShell();
     $("gear").classList.toggle("warn", !hasTmdbKey());
 
+    /* v1.3.0：**不再有「第一次使用要設定金鑰」那一頁**。
+       金鑰是鑰匙圈的公開值自動帶進來的，所以一律直接進片單；
+       真的拿不到金鑰時，片單區會出現「現在還不能查片」＋手貼逃生門（loadList 那條）。 */
     if (!hasTmdbKey()) {
-      try { history.replaceState({ h: "#/setup" }, "", "#/setup"); } catch (e) { }
-      renderSetup(true);
+      showHome(false);
+      loadList();
       return;
     }
     /* provider id 校正（1 次呼叫、快取 30 天）先做完再拉片單，
