@@ -1,4 +1,4 @@
-/* build 1.3.0 */
+/* build 1.4.0 */
 /* ⚠️ 上面那行 build 版本字串要跟 js/config.js 的 HLM_VER 一起 +1。
    兩個地方都要改是刻意的：瀏覽器判斷「SW 有沒有更新」是比對 sw.js 本身的位元組，
    只改 importScripts 進來的 config.js 有機會不觸發更新，那個症狀是「老闆永遠拿不到新版」。 */
@@ -17,6 +17,16 @@ var FILES = [
   "./",
   "./index.html",
   "./css/app.css",
+  /* ⚠️ 動效與開場這三個檔**一定要**進殼快取。
+     少了它們，離線開啟時 js/splash.js 載不到 → app.js 那邊雖然有
+     window.Splash && … 的守衛（不會整支死掉），但畫面會退成「沒有開場」，
+     而且 splash.css 沒到位的話 #splash 會是一塊沒套樣式的空白。
+     （範本那一輪 QA 實測：裸寫 Splash.hold() ＋ 沒預快取＝開場永遠卡在螢幕上。）
+     test/t14-motion.mjs 會**全掃** index.html 引用到的每一個本站 css/js，
+     少一個就紅——不是列白名單。 */
+  "./css/motion.css",
+  "./css/splash.css",
+  "./js/splash.js",
   "./js/keyring-unlock.js",
   "./js/config.js",
   "./js/store.js",

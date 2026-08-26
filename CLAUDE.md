@@ -25,7 +25,11 @@ Benson 看 Netflix 或去電影院之前，用來**一頁看完一部片值不�
 
 ```
 index.html    三個 section：#view-home / #view-detail / #view-setup（同一頁切換，不是多頁）
-css/app.css   全部樣式。深色 token 照 lab-ux 定案的 demo
+              ＋ body 最前面的 #splash（開場畫面），head 裡有開場的落地色票與 SPLASH_CONFIG
+css/app.css   配色與版面。深色 token 照 lab-ux 定案的 demo
+css/motion.css 動效 token 與規則（**只有動效、一個顏色都沒有**，見第 30 條）
+css/splash.css 開場畫面（印記風格）的長相，範本複製品，落地值寫在 index.html
+js/splash.js  開場流程＋從鑰匙圈讀外觀，範本複製品（不可以在這裡改，見第 30 條）
 js/config.js  版本號 HLM_VER、API 端點、快取 TTL、平台字典     ← sw.js 也 importScripts 這支
 js/store.js   localStorage：偏好 / 金鑰 / 快取（TTL + 總量上限 + 淘汰）
 js/api.js     TMDB / OMDb 呼叫、錯誤分類、資料正規化、快取包裝
@@ -71,9 +75,26 @@ GitHub Pages 也只服務 `index.html` / `css` / `js` / `icons` 那幾個檔。
      實例：R1c 本來在名單裡，補了 P03 測試之後它會紅了，就從名單移出去。
   4. 突變表裡**不可以寫死版本號之類會變的字串**，要從程式碼讀出來（`VERLINE` / `SWBUILD`）。
 
-> 環境限制：這台機器**沒有瀏覽器**（Playwright 下載 chromium 被 proxy 擋），所以
-> **版面與真實 API 都沒有被自動測試涵蓋**。CSS 只能做靜態檢查（字級、觸控尺寸、對比度算得出來的部分）。
-> 動到版面一定要請 Benson 實機看一眼。
+> 環境限制：Playwright 下載 chromium 被 proxy 擋，所以 **`npm test` 裡沒有任何真實版面測量**，
+> CSS 只能做靜態檢查（字級、觸控尺寸、對比度算得出來的部分）。動到版面一定要請 Benson 實機看一眼。
+>
+> ⚠️ **但這台機器有裝一般的 Chrome**（`C:/Program Files/Google/Chrome/Application/chrome.exe`），
+> 可以用 `--headless=new --virtual-time-budget --dump-dom` 做一次性的真實量測
+> （2026-08-25 就是這樣量到觸控目標、sticky、橫向溢出的實際數字）。三個雷：
+> ① **一定要給 `--user-data-dir` 指到暫存資料夾**，否則會去搶 Benson 正在用的那個 profile 而**整個卡住**；
+> ② 靜態伺服器要跑在**另一個 process**——`execFileSync` 會把 Node 的事件迴圈鎖住，同一個 process 裡的
+> server 根本回不了請求；③ **量動畫不能用 `--dump-dom`，要開 CDP 連線即時取樣**。
+>
+> ⚠️ 第 ③ 條的原始寫法是「headless 不會真的推進 CSS 動畫」——**那是錯的**，2026-08-26 QA 在同一台機器、
+> 同一支 Chrome 上推翻了：改用 `--headless=new --remote-debugging-port` 開一條 CDP 連線、依真實時間取樣，
+> 量到 **`document.getAnimations()` 有 11 條 playState=running**、片單進場逐幀取到 **42 個相異的 computed
+> transform**（`matrix(0.985,…,0,10)` → `matrix(1,…,0.0002)` → `none`），動畫結束後 `getAnimations().length = 0`
+> 且無殘留 transform；還能用 `Input.dispatchMouseEvent` 發真的滑鼠事件實壓 `:active`。
+> 量不到的是 `--virtual-time-budget --dump-dom` 那種**一次性快照**，**差別在方法不是環境**。
+>
+> **為什麼要特別寫清楚**：`fill:both` 把 `:active` 永久蓋掉（按鈕從此按不出回饋）這一類 bug，
+> **只有這種即時取樣的量法抓得到**，純功能測試與靜態斷言都抓不到。留著錯誤的敘述，
+> 下一個人就會以「headless 量不到」為由跳過這類驗證。
 
 ---
 
@@ -517,6 +538,95 @@ t13 §55 的樁矩陣照舊：每個點 × 四種壞法（不存在／少這個�
 **t13 的 SHA-256 比對**（我們這份 `js/keyring-unlock.js` 必須跟正本一模一樣）**不可以放寬**。
 正本現在是可寫的那份 clone（`/home/user/keyring/client/keyring-unlock.js`）；
 `xd1104/keyring` 那個唯讀 clone 已經落後。模組改版就重新複製一次，不要改比對。
+
+### 30. v1.4.0：動效基調（沉穩）＋ 開場畫面（印記）— 2026-08-25 定案
+
+範本正本在 `app-template/motion/`（已上線、已 QA 放行）。這支 App 只搬「會動的那一層」。
+
+#### ⛔ 絕對不要整包套範本的 `motion.css`
+範本那份帶著自己的色票，而它的 **`--bg` / `--surface` / `--muted` / `--line` 跟 `css/app.css` 撞名**
+——`<link>` 進來就會把「好雷嗎?」的深色配色整個蓋掉，變成範本的樣子。
+所以 `css/motion.css` 是**新寫的**：只有 15 個動效 token（數值逐字照範本的沉穩那組）
+＋ 綁在這支 App 自己 class 名稱上的規則。
+`t14 §65` 有**白名單斷言**：`motion.css` 只准宣告那 15 個變數，多一個就紅；
+`§66` 斷言它一個色碼都沒有。**要同步範本的新版動效時，一樣只搬 token 與規則。**
+
+#### 動效只做這五項（老闆「看得出差別」的那幾個），不要發散
+開場／按下回饋／搜尋結果與片單錯開進場／載入骨架屏／`#view-home ↔ #view-detail` 的 push-pop。
+**不因為動效而新增任何按鈕或連結**（「只查評價、不導購」沒有變）。
+
+- **按下回饋是全 App 每一個可點元素都要有**，不是挑幾個。`t14 §68` 用 jsdom 把首頁／詳細頁／設定頁
+  的可點元素**全掃出來逐一 `el.matches()`**，不是列白名單（上一輪範本就是列白名單漏了第 5 顆）。
+- **進場動畫一律 `backwards`，不可以用 `both`／`forwards`**：`both` 會永久保留最終 transform，
+  優先度高於一般宣告 ⇒ `:active{transform:scale()}` 從此失效、按鈕變成死的，而且純功能測試抓不到。
+  `t14 §67` 掃 `motion.css` 每一條 `animation:` 簡寫在擋這件事。
+- **push/pop 的 20px 橫向位移用 `#app{overflow-x:clip}` 收掉，不可以改成 `overflow-x:hidden`**：
+  hidden 會讓 `#app` 變成捲動容器，裡面的 `.stickyhead` / `.dtop`（`position:sticky`）就會黏錯對象。
+  （2026-08-25 用本機真 Chrome 實測：`overflow-x:clip` 下捲到 scrollY=157 時 `.stickyhead` 的
+  `getBoundingClientRect().top` 仍是 **0**，橫向溢出最大值 **0px**。）
+- 返回時首頁的 `.pop` 是「拿掉 class → 讀一次 `offsetWidth` 強制回流 → 加回去」重播的，
+  **不要改成用計時器移除**：動畫是 backwards fill，跑完不留 transform，本來就不需要收尾。
+
+#### 開場（`js/splash.js` ＋ `css/splash.css` 是範本複製品，不可以在這裡改）
+`t14 §74` 用 SHA-256 跟 `app-template/motion/` 比對（跟第 28 條的鑰匙圈模組同一個精神）。
+改法是回範本改，再複製過來。**特別是 `onColor()`：它跟鑰匙圈後台的預覽縮圖是同一份，分岔了
+Benson 在後台看到的就跟實機不一樣。**
+
+- **落地值只有 `index.html` 裡那一小塊**：`--splash-bg:#0b0d12` / `--splash-ink:#f3f5f9` /
+  `--splash-accent:#ffc14d` ＋ `SPLASH_CONFIG`（appId `movie-library`、glyph `雷`、name `好雷嗎?`、
+  tagline `一頁看完值不值得看`）。
+- **`--splash-bg` 必須逐字等於 `manifest.background_color` 與 `<meta theme-color>`**。
+  剛好三處本來就都是 `#0b0d12` ⇒ **manifest 完全不用改，他也不必把 App 從主畫面移除重加**
+  （已用 `t14 §60` 機器比對過，不是用看的）。不一致的症狀是「iPhone 從主畫面開會白閃一下」，
+  在電腦上永遠看不到、也不會有人回報。
+- **符號的文字色不是設定項**，由 `onColor(accent)` 算（白字／深字取對比高的那個，最差有下界）。
+  `t14 §72` 拿 `#00d038`（舊的亮度門檻算法在這裡只有 2.08:1）、`#438c83`（全色域最差）等
+  毒色碼**走真的程式路徑**驗對比 ≥3:1。**不要把它加成設定項，也不要「簡化」成亮度門檻。**
+- **只在冷啟動播**（`sessionStorage`）。切分頁、返回、從詳細頁回來都不重播。
+- **鑰匙圈的 `apps[].splash` 是快取優先、背景更新、下次冷啟動才生效**——
+  中途換字比晚一次生效難看得多。`t14 §73` 斷言 `applyLook` 在整支 splash.js 裡只被呼叫一次。
+  fetch 失敗（沒網路／壞 JSON／沒登記）一律無感、保留舊快取。
+
+#### ⭐ 呼叫端的兩件事，缺一不可（範本那輪 QA 實測過的災情）
+1. **`sw.js` 的 `SHELL` 要預快取 `css/motion.css` / `css/splash.css` / `js/splash.js`**。
+   `t14 §63` 會**全掃** `index.html` 引用到的每一個本站 css/js，逐一驗它在不在 `FILES` 裡。
+2. **`app.js` 一律寫 `window.Splash && …` ＋ `try/catch` ＋ `splashFallback()`**，
+   絕對不可以裸寫 `Splash.hold()`：那支檔案載不到時（離線、部署漏檔）會丟 `ReferenceError`
+   ⇒ **整支 app.js 的 IIFE 當場中止 ⇒ 0 筆資料、沒套樣式的開場永遠卡在螢幕上，
+   而保險絲就住在那支沒載到的檔案裡**。
+   `splashFallback()` 除了收掉 `#splash`，還要補上 `touchstart` 監聽——
+   平常那行在 splash.js 裡，沒有它 iOS 的 `:active` 全部是死的。
+   > 順帶：`test/harness.mjs` 本來就會把所有 `<script src>` 拿掉，
+   > 所以 **t1～t13 每一支都是在「沒有 Splash」的情況下跑的 ＝ 天然的負控組**。
+
+`splashReady()` 掛在每一條「畫面畫好了」的出口（片單成功／失敗／逃生門／詳細頁三條／設定頁），
+**失敗也要叫**，不然開場會變成當機畫面、要停到 6 秒保險絲才走。
+
+#### ⚠️ `test/mutate.mjs` 在這台 Windows 機器上本來是壞的（2026-08-25 修好）
+兩個問題，**都會讓它謊報**：
+1. `hashAll()` 的 `cd ${ROOT}` 沒有引號 → 路徑含空格（`Claude Work`）時 `bash: cd: too many arguments`
+   → 整支跑不起來。
+2. 工作區是 **CRLF**（Windows 的 `core.autocrlf`），而突變表裡的目標字串一律寫 `\n`
+   → **127 條裡有 50 條被判成 stale**，而 stale 依這支工具自己的鐵律①就是
+   「那件事現在沒有任何人在驗」。很容易被誤讀成「重構改壞了」而去改突變表（改了反而全錯）。
+   → 現在比對與套用都在 LF 空間做，寫回檔案前換回原檔的換行風格；還原寫的是原始位元組，
+   SHA-256 驗證照舊。另外加了一條**自證**：突變後的內容跟原檔一模一樣就直接 exit 2
+   （「改壞了測試還是綠的」跟「其實根本沒改到」必須分得出來）。
+
+**`EXEMPT_COUNT` 仍然是 3**（R1a／V09／對照組）——這一輪新增的 15 條動效突變**全部預期會紅**。
+
+#### 這一輪突變測試自己抓到的兩件事（留著當範例）
+1. **X15（`defer`）第一次是綠的**：我原本寫 `!/<script src="\.\/js\/splash\.js"[^>]*(defer|async)/`，
+   而突變產生的是 `<script defer src="…">`——**屬性順序一換就繞過去了**。
+   正解是先抓整個標籤（`<script[^>]*src="…"[^>]*>`）再驗屬性。
+   127 條裡唯一沒守住的就是它，靠工具抓出來的，不是靠讀程式碼。
+   🔁 通則：**「X 後面不准接 Y」這種斷言，遇到屬性／參數順序可換的語法一定要改成「先取整體再驗」。**
+2. **`css/splash.css` 是範本複製品，它的預設值是「範／App 範本／#241f1b」**。
+   「`splash.js` 載不到但 `splash.css` 載到了」的那一次（第一次進站、還沒有 SW、網路不穩），
+   畫面上就會出現**別人家的品牌**。所以 `index.html` 的 `<style>` 連
+   `--splash-glyph` / `--splash-name` / `--splash-tagline` 也一起蓋掉，
+   `t14 §61` 用**全掃描**（把 splash.css 宣告的每一個 `--splash-*` 抓出來逐一驗有沒有被蓋）在守，
+   唯一的例外是 `--splash-on-accent`（刻意由 `onColor()` 算，不是設定項）。
 
 ---
 

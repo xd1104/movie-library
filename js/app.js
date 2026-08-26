@@ -7,6 +7,41 @@
   var $ = function (id) { return document.getElementById(id); };
   var UI = HLM_UI, Api = HLM_Api, S = HLM_Store, C = HLM_CFG;
 
+  /* ---------- 開場畫面（js/splash.js）----------
+     ⚠️ 一定要寫成 window.Splash && …，**不可以裸寫 Splash.hold()**。
+     那支模組載不到的時候（離線、SW 沒預快取、部署漏檔）裸寫會丟 ReferenceError
+     ⇒ 整支 app.js 的 IIFE 當場中止 ⇒ 0 筆資料、沒套樣式的 #splash 永遠卡在畫面上，
+     而且**保險絲就住在那支沒載到的檔案裡**，不會有人來救。
+     （範本那一輪 QA 實測過的災情，見 lab 手冊 D 段。）
+     這支 App 的測試治具（test/harness.mjs）本來就會把所有 <script src> 拿掉，
+     所以 t1～t13 每一支都是在「沒有 Splash」的情況下跑的 ＝ 天然的負控組。 */
+  var hasSplash = !!(window.Splash && window.Splash.hold && window.Splash.ready);
+  if (hasSplash) { try { Splash.hold(); } catch (e) { hasSplash = false; } }
+  if (!hasSplash) splashFallback();
+
+  function splashFallback() {
+    /* 自己把開場收掉。全螢幕的東西卡住＝App 打不開，比白畫面嚴重一個等級。 */
+    try {
+      var sp = document.getElementById("splash");
+      if (sp && sp.parentNode) sp.parentNode.removeChild(sp);
+      document.documentElement.setAttribute("data-splash", "off");
+    } catch (e) { }
+    /* splash.js 平常會掛這一行；沒有它的話 iOS Safari 的 :active 不會觸發
+       ＝ 手機上所有按下回饋都是死的。 */
+    try { document.addEventListener("touchstart", function () { }, { passive: true }); }
+    catch (e) { try { document.addEventListener("touchstart", function () { }, false); } catch (e2) { } }
+  }
+
+  /* 資料回來（成功或失敗都要）就叫一次，開場才會收 —— 失敗也要叫，
+     不然開場會變成當機畫面、要停到 6 秒的保險絲才走。
+     只認第一次：之後的重載片單、切分頁都不該再影響開場。 */
+  var splashDone = false;
+  function splashReady() {
+    if (splashDone) return;
+    splashDone = true;
+    if (window.Splash && window.Splash.ready) { try { Splash.ready(); } catch (e) { } }
+  }
+
   /* ---------- 狀態 ---------- */
   var state = {
     tab: S.get("hlm_tab", "cinema") === "stream" ? "stream" : "cinema",
@@ -148,6 +183,8 @@
       $("sortbtn").classList.add("hide");
       var kk = S.keys();
       $("emptyBox").innerHTML = UI.keyErrorHTML(kk, krErrCtx());
+      /* 逃生門也算「畫面好了」：開場要收，不可以讓他對著開場畫面等 6 秒保險絲 */
+      if (!krState.loading) splashReady();
       return;
     }
 
@@ -174,6 +211,7 @@
     }
 
     p.then(function (r) {
+      splashReady();                       /* 片單資料到了＝可以收開場了 */
       if (seq !== listReq) return;
       var items = r.v.slice();
       for (var i = 0; i < items.length; i++) items[i].inCinema = !!state.cinemaIds[items[i].id];
@@ -224,6 +262,7 @@
       /* 串流／搜尋列表的平台色塊：背景慢慢補（TMDB 呼叫、有 24 小時快取；OMDb 絕不在列表呼叫） */
       if (mode !== "cinema") fillProviders(items, seq, mode);
     }).catch(function (e) {
+      splashReady();                       /* 失敗也要收開場，否則開場變成當機畫面 */
       if (seq !== listReq) return;
       $("listTitle").textContent = "";
       $("list").innerHTML = "";
@@ -467,6 +506,7 @@
       if (oHit) { ctx.scores = oHit.v; ctx.ready = true; stamps.push(oHit.t); }
       else if (!S.keys().omdb) { ctx.ready = true; ctx.scoreErr = "nokey"; }
       paint();
+      splashReady();          /* 直接用網址開某部片時，這一頁畫完就可以收開場 */
       if (!pvHit) loadPv();
       if (!oHit && S.keys().omdb) loadScores();
       return;
@@ -480,6 +520,7 @@
     for (var _k in state.cinemaIds) { needCine = false; break; }
 
     Api.movie(id).then(function (r) {
+      splashReady();
       if (curId !== id) return;
       mv = r.v; stamps.push(r.t);
       mv.inCinema = !!state.cinemaIds[id];
@@ -493,6 +534,7 @@
         if (state.cinemaIds[id]) { mv.inCinema = true; paint(); }
       });
     }).catch(function (e) {
+      splashReady();
       if (curId !== id) return;
       $("dbody").innerHTML = '<div style="padding:16px">' + UI.errorBox(e) +
         '</div><div class="backbar"><button type="button" id="back2">' + UI.esc(backLabel()) + "</button></div>";
@@ -540,6 +582,7 @@
     k.tmdbMask = maskKey(k.tmdb);
     k.omdbMask = maskKey(k.omdb);
     $("sbody").innerHTML = UI.setupHTML(k, firstRun);
+    splashReady();          /* 直接用 #/setup 開 App 時，這一頁畫完就可以收開場 */
     var st = S.cacheStats();
     $("cachestat").textContent = "目前存了 " + st.n + " 筆資料（約 " + st.kb + " KB）。清掉之後下次會重新跟 TMDB 要，額度也會多用一點。";
     if (!S.lsOK) {
@@ -573,12 +616,24 @@
 
   /* ---------- 視圖切換 / 路由 ---------- */
   function showHome(restoreScroll) {
+    var was = state.view;
     state.view = "home";
     curId = null;
     $("view-detail").classList.remove("on");
     $("view-setup").classList.remove("on");
     $("view-home").style.display = "block";
     $("gear").classList.toggle("warn", !hasTmdbKey());
+    /* 返回（pop）：首頁從**左邊**回來，跟進詳細頁的方向相反 —— 那是使用者的方向感。
+       只有真的從詳細頁／設定頁退回來才播；開機那次不播（開場的 .boot 已經在演了）。
+       重播動畫的正規做法：拿掉 class → 讀一次 offsetWidth 強制回流 → 再加回去。
+       動畫是 backwards fill，跑完不留 transform，所以不用計時器收尾，
+       也不會把首頁上那些按鈕的 :active 壓掉。 */
+    if (was === "detail" || was === "setup") {
+      var vh = $("view-home");
+      vh.classList.remove("pop");
+      void vh.offsetWidth;
+      vh.classList.add("pop");
+    }
     window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);
   }
 

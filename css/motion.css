@@ -1,0 +1,266 @@
+/* ============================================================
+   motion.css — 動效基調（沉穩 steady）
+   ------------------------------------------------------------
+   Benson 2026-08-25 拍板的基調，token 數值逐字照 app-template/motion/motion.css。
+
+   ⚠️ 這份**刻意只有動效，一個顏色都沒有**。
+      範本的 motion.css 帶著自己的色票，而它的 --bg / --surface / --muted / --line
+      跟這支 App（css/app.css）**變數撞名** —— 整包 link 進來會把「好雷嗎?」的
+      深色配色整個蓋掉，變成範本的樣子。所以我們只抄「會動的那一層」，
+      配色永遠以 css/app.css 為準（--bg:#0b0d12、--gold:#ffc14d …）。
+      ⛔ 以後要同步範本的新版動效時，一樣只搬 token 與規則，不要搬 :root 的顏色。
+
+   ⚠️ 載入順序：app.css → motion.css → splash.css（見 index.html）。
+      排在 app.css 後面是刻意的：同權重時後宣告者勝，
+      這裡的 transition／animation 才不會被 app.css 既有的規則吃掉。
+
+   規則只綁「這支 App 自己的 class 名稱」，沒有 .pressable 這種要改 HTML 的通用類別
+   —— 不用動 ui.js 產生的字串，就不會有「漏加 class 的地方沒有回饋」這種洞。
+   ============================================================ */
+
+
+/* ============================================================
+   1. Token（唯一可調的一層）
+   ------------------------------------------------------------
+   ⚠️ 掛在 :root，不要掛在 body：splash.css 的 --sp-out 是在 :root 那一層
+      對 var(--dur-2) 做代換的，token 只存在 body 的話它會拿到「未定義」
+      → animation-duration 掉回 0s → 開場收場會瞬間跳掉，而且極難查。
+   時間階梯只有四級，不要出現第五個數字。
+   ============================================================ */
+:root{
+  /* 時間 */
+  --dur-press:120ms;   /* 按下／放開的回饋 */
+  --dur-1:180ms;       /* 微變化：顏色、透明度、開關 */
+  --dur-2:280ms;       /* 主要位移：卡片進場、換頁、分頁切換 */
+  --dur-3:420ms;       /* 大範圍／需要被看見的：開場、高亮 */
+
+  /* 曲線 */
+  --ease:cubic-bezier(.22,.61,.36,1);        /* 進場／位移（減速收尾） */
+  --ease-in:cubic-bezier(.45,0,.9,.4);       /* 離場（加速離開） */
+  --ease-press:cubic-bezier(.2,0,.2,1);      /* 按下回饋 */
+  --ease-page:cubic-bezier(.22,.61,.36,1);   /* 全螢幕換頁，禁止回彈曲線 */
+
+  /* 位移距離 */
+  --lift:10px;         /* 小位移：卡片、toast */
+  --lift-lg:20px;      /* 大位移：換頁橫向 */
+
+  /* 縮放 */
+  --scale-in:.985;     /* 進場起始縮放 */
+  --press:.985;        /* 大面積元素按下（卡片、整寬按鈕） */
+  --press-lg:.96;      /* 小元素按下（圖示鈕、chip、分頁） */
+
+  /* 錯開 */
+  --stagger:45ms;      /* 清單第 n 項的延遲 = n × stagger */
+
+  /* 閱讀時間：不是動效，不隨調性改變 */
+  --hold-toast:2400ms;
+}
+
+
+/* ============================================================
+   2. 按下回饋（優先度最高：手機沒有 hover，這是唯一「我按到了」的訊號）
+   ------------------------------------------------------------
+   ⚠️ 這一段列的是**全 App 每一個可點的東西**，不是挑幾個有感的做。
+      新增可點元素時要一起加進來（test/t14-motion.mjs 會全掃 ui.js 與 index.html，
+      找出所有可點元素，逐一驗它有沒有 :active 縮放，不是列白名單）。
+   ⚠️ 只動 transform（compositor-only）。底色的 :active 由 app.css 負責，這裡不碰顏色。
+   ============================================================ */
+
+/* 大面積：卡片、整寬按鈕、貼文列 */
+.row,
+.btn,
+.backbar button,
+.pttpost{
+  transition:transform var(--dur-press) var(--ease-press);
+}
+.row:active,
+.btn:active,
+.backbar button:active,
+.pttpost:active{transform:scale(var(--press));}
+/* 網址不合格的貼文列是純文字、不可點 —— 不可以給它按下回饋（會看起來像壞掉的按鈕） */
+.pttpost.nolink,
+.pttpost.nolink:active{transform:none;transition:none;}
+
+/* 小元素：圖示鈕、chip、分頁、文字鈕 */
+.iconbtn,
+.sicon,
+.clearbtn,
+.tab,
+.pf,
+.chip,
+.chip .x,
+.sortbtn,
+.backbtn,
+.morebtn,
+.srcfoot button,
+.ptterr button,
+.updatebar .ub,
+.updatebar .ux,
+.linkbtn{
+  transition:transform var(--dur-press) var(--ease-press);
+}
+.iconbtn:active,
+.sicon:active,
+.clearbtn:active,
+.tab:active,
+.pf:active,
+.chip:active,
+.chip .x:active,
+.sortbtn:active,
+.backbtn:active,
+.morebtn:active,
+.srcfoot button:active,
+.ptterr button:active,
+.updatebar .ub:active,
+.updatebar .ux:active,
+.linkbtn:active{transform:scale(var(--press-lg));}
+
+/* 平台標籤是資訊、不是按鈕（CLAUDE.md 第 9 條）：明確寫死沒有按下回饋 */
+.pv,.pv:active{transform:none;}
+
+
+/* ============================================================
+   3. 清單進場（錯開）
+   ------------------------------------------------------------
+   只有「資料換了一批」才播：#list 的 innerHTML 被整批換掉時，
+   新節點自然會重播一次。捲動時不補播（不用 IntersectionObserver）。
+
+   ⚠️ 一律 backwards，不可以用 both／forwards：
+      both 會永久保留最終 transform，優先度高於一般宣告
+      ⇒ .row:active{transform:scale()} 從此失效、卡片按起來是死的
+      （純功能測試抓不到這種 bug，t14 有靜態斷言在守）。
+
+   stagger 上限 12：用 nth-child 寫死，比在 ui.js 算 --i 少一個「忘了傳 index」的洞。
+   第 13 筆以後跟第 12 筆同時進場（否則第 20 筆要等快 1 秒才出現）。
+   ============================================================ */
+#list > .row{
+  animation:hlm-item-in var(--dur-2) var(--ease) backwards;
+}
+@keyframes hlm-item-in{
+  from{opacity:0;transform:translateY(var(--lift)) scale(var(--scale-in));}
+  to  {opacity:1;transform:none;}
+}
+#list > .row:nth-child(1){animation-delay:0ms;}
+#list > .row:nth-child(2){animation-delay:calc(var(--stagger) * 1);}
+#list > .row:nth-child(3){animation-delay:calc(var(--stagger) * 2);}
+#list > .row:nth-child(4){animation-delay:calc(var(--stagger) * 3);}
+#list > .row:nth-child(5){animation-delay:calc(var(--stagger) * 4);}
+#list > .row:nth-child(6){animation-delay:calc(var(--stagger) * 5);}
+#list > .row:nth-child(7){animation-delay:calc(var(--stagger) * 6);}
+#list > .row:nth-child(8){animation-delay:calc(var(--stagger) * 7);}
+#list > .row:nth-child(9){animation-delay:calc(var(--stagger) * 8);}
+#list > .row:nth-child(10){animation-delay:calc(var(--stagger) * 9);}
+#list > .row:nth-child(11){animation-delay:calc(var(--stagger) * 10);}
+#list > .row:nth-child(n+12){animation-delay:calc(var(--stagger) * 11);}
+
+/* 空狀態／錯誤卡：比一般項目慢一級進場——它是「這裡真的沒東西」的宣告，不是清單的一員 */
+#emptyBox > *{
+  animation:hlm-item-in var(--dur-3) var(--ease) backwards;
+}
+
+
+/* ============================================================
+   4. 載入中（骨架屏）
+   ------------------------------------------------------------
+   骨架卡片本身就是 .row，所以上面那段的 stagger 直接吃得到。
+   shimmer（app.css 的 @keyframes sh）是「還在等」的心跳，
+   1.2s 固定、不隨調性改變。
+   這裡只補一件事：骨架內部的條也跟著淡入，換成真內容時不會突然「長出來」。
+   ============================================================ */
+.skel{
+  animation-name:sh,hlm-fade-in;
+  animation-duration:1.2s,var(--dur-2);
+  animation-timing-function:linear,var(--ease);
+  animation-iteration-count:infinite,1;
+  animation-fill-mode:none,backwards;
+}
+@keyframes hlm-fade-in{from{opacity:0;}to{opacity:1;}}
+
+
+/* ============================================================
+   5. 進出詳細頁的 push / pop（方向感）
+   ------------------------------------------------------------
+   這支 App 是「同一頁切 section」，不是真的多頁，所以做法是：
+     進去（push）＝ 新頁從右邊推進來
+     返回（pop） ＝ 首頁從左邊回來
+   兩段不重疊（離開的那頁是 display:none 直接消失），
+   但方向相反，手上就有「我進去了 / 我退回來了」的方向感。
+
+   ⚠️ 一律 backwards：動畫結束後不留 transform，
+      詳細頁裡的按鈕 :active 才不會被吃掉（見第 2 段的說明）。
+   ⚠️ #app 加 overflow-x:clip：橫向位移的那 20px 不可以撐出橫向捲動。
+      用 clip 不用 hidden 是刻意的 —— hidden 會讓 #app 變成捲動容器，
+      裡面的 .stickyhead / .dtop（position:sticky）就會黏錯對象；
+      clip 只裁切、不建立捲動容器，sticky 照舊黏在視窗上。
+      舊瀏覽器不認得 clip 會整條忽略，頂多回到「有一瞬間可以橫捲」，不會壞掉。
+   ============================================================ */
+#app{overflow-x:clip;}
+
+#view-detail.on,
+#view-setup.on{
+  animation:hlm-page-in var(--dur-2) var(--ease-page) backwards;
+}
+@keyframes hlm-page-in{
+  from{opacity:0;transform:translateX(var(--lift-lg));}
+  to  {opacity:1;transform:none;}
+}
+
+/* 返回：首頁從左邊回來（由 app.js 的 showHome() 掛上 .pop，方向跟 push 相反） */
+#view-home.pop{
+  animation:hlm-page-pop var(--dur-2) var(--ease-page) backwards;
+}
+@keyframes hlm-page-pop{
+  from{opacity:0;transform:translateX(calc(var(--lift-lg) * -1));}
+  to  {opacity:1;transform:none;}
+}
+
+
+/* ============================================================
+   6. 開場收場之後的銜接（.boot 由 splash.js 掛上，1400ms 後自己拿掉）
+   ------------------------------------------------------------
+   收場動畫與內容進場要「重疊」不要「串接」：串接會有一個很明顯的空拍，
+   那個空拍就是廉價感的來源。
+   ⚠️ 同樣是 backwards（不是 both）：.boot 掛著的那 1.4 秒內
+      使用者就已經可以按東西了，殘留 transform 會殺掉 :active。
+   ============================================================ */
+.boot .brand,
+.boot .stickyhead,
+.boot .body{
+  animation:hlm-boot-el var(--dur-3) var(--ease) backwards;
+}
+.boot .brand{animation-delay:0ms;}
+.boot .stickyhead{animation-delay:calc(var(--stagger) * 1.6);}
+.boot .body{animation-delay:calc(var(--stagger) * 3.2);}
+@keyframes hlm-boot-el{
+  from{opacity:0;transform:translateY(calc(var(--lift) * 1.2)) scale(var(--scale-in));}
+  to  {opacity:1;transform:none;}
+}
+
+
+/* ============================================================
+   7. Toast：改成吃 token（原本寫死 .2s）
+   ============================================================ */
+.toast{
+  transition:opacity var(--dur-1) var(--ease),transform var(--dur-2) var(--ease);
+}
+
+
+/* ============================================================
+   8. 減少動態
+   ------------------------------------------------------------
+   只把 token 歸零（1ms），元件規則一行都不改。
+   刻意用 1ms 而不是 animation:none：動畫照跑、animationend 照樣觸發，
+   「等動畫結束才做事」的流程完全不用寫第二套。
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  :root{
+    --dur-press:1ms; --dur-1:1ms; --dur-2:1ms; --dur-3:1ms;
+    --ease:linear; --ease-in:linear; --ease-press:linear; --ease-page:linear;
+    --lift:0px; --lift-lg:0px; --scale-in:1;
+    --press:1; --press-lg:1;
+    --stagger:0ms;
+  }
+  /* app.css 已經有 .skel{animation:none}，但這裡多宣告了 animation-name，
+     權重相同而我們排在後面 —— 要自己把 shimmer 關掉，不然它會活過來。 */
+  .skel{animation:none;}
+}

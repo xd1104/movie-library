@@ -168,10 +168,12 @@ const M = [
   ["K07 setupKeyring 沒有 try/catch（模組丟例外就整支停掉）", "js/app.js", `  try { setupKeyring(); } catch (e) { }
   boot();`, `  setupKeyring();
   boot();`],
-  ["K08 又把自動彈解鎖加回來（公開模式不該有登入畫面）", "js/app.js", `    $("gear").classList.toggle("warn", !hasTmdbKey());
-    window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);`, `    $("gear").classList.toggle("warn", !hasTmdbKey());
-    if (krOn()) krTry(function () { Keyring.maybeIntro(); });
-    window.scrollTo(0, restoreScroll ? (state.homeScroll || 0) : 0);`],
+  /* ⚠️ 2026-08-25：showHome() 中間插進了返回動畫（.pop）那段，原本的兩行不再相鄰，
+     所以錨點改到函式開頭。改的是「錨在哪」，不是把突變放寬。 */
+  ["K08 又把自動彈解鎖加回來（公開模式不該有登入畫面）", "js/app.js", `  function showHome(restoreScroll) {
+    var was = state.view;`, `  function showHome(restoreScroll) {
+    var was = state.view;
+    if (krOn()) krTry(function () { Keyring.maybeIntro(); });`],
   ["K10 index.html 沒載入鑰匙圈模組", "index.html", `<script src="./js/keyring-unlock.js"></script>
 `, ``],
   ["K11 鑰匙圈模組沒進 sw.js 殼快取", "sw.js", `  "./js/keyring-unlock.js",
@@ -210,6 +212,30 @@ const M = [
     ctx.hasModule = !!(window.Keyring && Keyring.isPublic());`],
   ["P5 逃生門存完金鑰不重畫片單（他會卡在錯誤畫面）", "js/app.js", `      if (state.view === "home" && hasTmdbKey()) afterSetup();
 `, ``],
+  /* ---- 動效基調（沉穩）＋ 開場畫面（印記）：2026-08-25 定案，t14-motion 在守 ---- */
+  ["X01 開場永遠不收（app 忘了說「我好了」）", "js/app.js", `      splashReady();                       /* 片單資料到了＝可以收開場了 */\n`, ``],
+  ["X02 裸寫 Splash.hold()（模組載不到就整支 App 死掉）", "js/app.js", `  var hasSplash = !!(window.Splash && window.Splash.hold && window.Splash.ready);
+  if (hasSplash) { try { Splash.hold(); } catch (e) { hasSplash = false; } }
+  if (!hasSplash) splashFallback();`, `  Splash.hold();`],
+  ["X03 動效 token 被改壞（--dur-2 慢十倍）", "css/motion.css", `  --dur-2:280ms;`, `  --dur-2:2800ms;`],
+  ["X04 曲線被換掉（不再是沉穩那組）", "css/motion.css", `  --ease:cubic-bezier(.22,.61,.36,1);`, `  --ease:ease;`],
+  ["X05 進場動畫改用 both（會永久殺掉 :active）", "css/motion.css", `  animation:hlm-item-in var(--dur-2) var(--ease) backwards;`, `  animation:hlm-item-in var(--dur-2) var(--ease) both;`],
+  ["X06 splash.js 沒進 sw.js 殼快取（離線就沒有開場）", "sw.js", `  "./js/splash.js",\n`, ``],
+  ["X07 範本的色票被抄進 motion.css（--bg 撞名，會蓋掉整套配色）", "css/motion.css", `  --stagger:45ms;`, `  --bg:#171513;\n  --stagger:45ms;`],
+  ["X08 開場底色跟 manifest 不一致（iPhone 會白閃一下）", "index.html", `    --splash-bg:#0b0d12;`, `    --splash-bg:#0c0d12;`],
+  ["X09 符號字色寫死白字（不再由 onColor 算，白底就看不見）", "js/splash.js", `      setVar("--splash-on-accent", onColor(look.accent));`, `      setVar("--splash-on-accent", "#ffffff");`],
+  ["X10 熱啟動也重播開場（切分頁回來又演一次）", "js/splash.js", `      if (W.sessionStorage.getItem(SEEN_KEY)) return false;`, `      if (false) return false;`],
+  ["X11 讀到鑰匙圈就中途換字（名字會跳動）", "js/splash.js", `    writeCache(look);`, `    writeCache(look); applyLook(look);`],
+  ["X12 分頁少了按下回饋（全掃描要抓得到漏掉的那一顆）", "css/motion.css", `.tab:active,\n`, ``],
+  ["X13 返回沒有方向感（首頁不播 pop）", "js/app.js", `    if (was === "detail" || was === "setup") {
+      var vh = $("view-home");
+      vh.classList.remove("pop");
+      void vh.offsetWidth;
+      vh.classList.add("pop");
+    }
+`, ``],
+  ["X14 拿掉開場的收場保險絲（ready 不來就永遠卡著）", "js/splash.js", `  W.setTimeout(function () { dismiss(); }, FUSE);\n`, ``],
+  ["X15 splash.js 加了 defer（會先畫預設值再跳成新名字）", "index.html", `<script src="./js/splash.js"></script>`, `<script defer src="./js/splash.js"></script>`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 
@@ -218,7 +244,7 @@ const M = [
    跑到一半誤判成「還原失敗」直接 exit 2 —— 2026-08-23 真的踩到過。
    這支要驗的是「原始碼有沒有被還原」，.git 裡的東西不在範圍內。 */
 const hashAll = () => execFileSync("bash", ["-c",
-  `cd ${ROOT} && find . \\( -path ./node_modules -o -path ./.git \\) -prune -o -type f -print | sort | xargs sha256sum`]).toString();
+  `cd "${ROOT}" && find . \\( -path ./node_modules -o -path ./.git \\) -prune -o -type f -print | sort | xargs sha256sum`]).toString();
 const BASE = hashAll();
 let CUR = null;
 const restore = () => { if (CUR) { writeFileSync(CUR.p, CUR.o); CUR = null; } };
@@ -252,8 +278,19 @@ const EXEMPT_COUNT = 3;
 const exemptDefined = M.filter(m => /預期全綠/.test(m[0]));
 
 function pairsOf(from, to) { return Array.isArray(from) ? from : [[from, to]]; }
+
+/* ⚠️ 換行正規化：Windows 上 git 預設 core.autocrlf=true，工作區的檔案是 **CRLF**，
+   而這張突變表裡的目標字串一律寫 \n。不正規化的話，**每一條跨行的突變都會被判成 stale**
+   —— 而 stale 依這支工具自己的鐵律①就是「那件事現在沒有任何人在驗」。
+   2026-08-25 在這台機器上實測：127 條裡有 50 條就是這樣靜默失效的，
+   而且它報的是「目標字串已失效」，很容易被當成「重構改壞了」而去改突變表（改了反而全錯）。
+   做法：比對與套用都在 LF 空間做，寫回檔案前再換回原檔的換行風格；
+   還原時寫的是**一個位元組都沒動過的原始內容**，所以 SHA-256 驗證照樣成立。 */
+const toLF = s => s.replace(/\r\n/g, "\n");
+const hasCRLF = s => s.indexOf("\r\n") >= 0;
+
 function staleTargets(file, from, to) {
-  const src = readFileSync(ROOT + "/" + file, "utf8");
+  const src = toLF(readFileSync(ROOT + "/" + file, "utf8"));
   return pairsOf(from, to).filter(([f]) => src.indexOf(f) < 0);
 }
 
@@ -309,8 +346,12 @@ for (const [id, file, from, to] of picked) {
     continue;
   }
   CUR = { p, o };
-  let mutated = o;
+  let mutated = toLF(o);
   for (const [f, t2] of pairsOf(from, to)) mutated = mutated.split(f).join(t2);
+  if (hasCRLF(o)) mutated = mutated.replace(/\n/g, "\r\n");   /* 換回原檔的換行風格 */
+  /* 自證：突變真的套用了。沒有這一條的話，「改壞了測試還是綠的」跟
+     「其實根本沒改到」會長得一模一樣（手冊 D 段：看到綠燈更要懷疑）。 */
+  if (mutated === o) { console.error("!!! 突變沒有真的改到檔案：" + id); process.exit(2); }
   writeFileSync(p, mutated);
   process.stderr.write("  跑 " + id + "\n");
   let red = [];

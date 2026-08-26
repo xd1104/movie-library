@@ -13,8 +13,73 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="好雷嗎">
 <link rel="stylesheet" href="./css/app.css">
+<!-- 動效基調（沉穩）＋ 開場畫面（印記）。
+     ⚠️ 順序：app.css → motion.css → splash.css。
+        motion.css 排在 app.css 後面是刻意的（同權重時後宣告者勝）；
+        splash.css 要吃 motion.css 的 --dur-* token，所以一定排在它後面。
+     ⚠️ motion.css 只有動效、沒有任何顏色 —— 範本那份的色票變數跟這支 App 撞名
+        （--bg / --surface / --muted / --line），整包抄會把配色蓋掉。 -->
+<link rel="stylesheet" href="./css/motion.css">
+<link rel="stylesheet" href="./css/splash.css">
+<style>
+  /* ⭐ 開場外觀的落地值就這一塊（其餘一律不用動 css/splash.css）。
+     ⚠️ --splash-bg 必須**逐字**等於 manifest.webmanifest 的 background_color
+        與上面那行 meta theme-color，否則 iPhone 從主畫面開 App 會白閃一下
+        （iOS 會先畫一張用 background_color 的系統開場，關不掉）。
+        剛好三處本來就都是 #0b0d12 ⇒ manifest 不用改、他也不必把 App 從主畫面移除重加。
+        test/t14-motion.mjs 會逐字比對這三處。
+     ⚠️ 符號的文字色**不在這裡也不是設定項**，由 js/splash.js 的 onColor() 從 accent 算出來。 */
+  :root{
+    --splash-bg:#0b0d12;      /* = manifest.background_color = --bg */
+    --splash-ink:#f3f5f9;     /* = --text */
+    --splash-accent:#ffc14d;  /* = --gold */
+    /* ⭐ 符號與名字也在這裡再寫一次（splash.js 平常會用 :root 的 inline style 蓋過去）。
+       為什麼要重複：css/splash.css 是範本的複製品，它的預設值是「範／App 範本」。
+       萬一 splash.js 載不到、splash.css 卻載到了（第一次進站、還沒有 SW、網路不穩），
+       畫面上會出現**別人家的品牌**。寫在這裡的話，最壞情況也只是「靜止的好雷嗎開場」。 */
+    --splash-glyph:"雷";
+    --splash-name:"好雷嗎?";
+    --splash-tagline:"一頁看完值不值得看";
+  }
+</style>
+<script>
+  /* 必須在 splash.js 之前 */
+  window.SPLASH_CONFIG = {
+    appId: "movie-library",   /* ASCII，跟 repo 同名，也跟 HLM_CFG.krAppId 一樣 */
+    version: "1",             /* 改版時 +1，改版後第一次進站會再播一次開場 */
+    keyringUrl: "https://xd1104.github.io/keyring/keyring.json",
+    bootSelector: "#app",
+    defaults: {               /* 鑰匙圈沒設、或讀不到時用這一組 */
+      name: "好雷嗎?",
+      glyph: "雷",
+      bg: "#0b0d12",
+      accent: "#ffc14d",
+      ink: "#f3f5f9",
+      tagline: "一頁看完值不值得看"
+    }
+  };
+</script>
+<!-- ⚠️ 同步 script，不要加 defer／async，也不要搬到 body 最後：
+     它要在 body 開始解析之前就把外觀寫成 :root 的 CSS 變數，
+     開場第一次被畫出來時就已經是對的樣子 ⇒ 不可能「先畫預設再中途換字」。 -->
+<script src="./js/splash.js"></script>
 </head>
 <body>
+
+<!-- 開場畫面。文字（符號、名字、標語）是 CSS 用 content:var(--splash-*) 畫出來的，
+     所以這幾個元素刻意是空的 —— 不要把名字寫死在這裡。
+     aria-hidden：開場是純視覺的，不要讀給輔助技術聽。 -->
+<div id="splash" aria-hidden="true">
+  <div class="sp-core">
+    <div class="sp-ring"></div>
+    <div class="sp-glyph"></div>
+    <div class="sp-below">
+      <div class="sp-name"></div>
+      <div class="sp-tag"></div>
+    </div>
+  </div>
+</div>
+
 <div id="app">
 
   <!-- ============ 片單／搜尋頁 ============ -->

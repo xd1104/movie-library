@@ -26,7 +26,8 @@ const NAME = {
   "t10-guards": "守衛（交辦項目與縱深防禦）",
   "t11-ptt": "PTT 鄉民評價（解析、比對、健康檢查）",
   "t12-ptt-ui": "PTT 鄉民風向（畫面五種狀態）",
-  "t13-keyring": "鑰匙圈（跨 App 身分）的接法"
+  "t13-keyring": "鑰匙圈（跨 App 身分）的接法",
+  "t14-motion": "動效基調（沉穩）與開場畫面（印記）"
 };
 
 const results = await Promise.all(FILES.map(async f => {
