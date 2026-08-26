@@ -1,13 +1,13 @@
 {
-  "updated": "2026-08-25T19:56:53Z",
+  "updated": "2026-08-26T22:24:57Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 787,
-    "tagged": 156,
-    "matched": 102,
+    "posts": 784,
+    "tagged": 151,
+    "matched": 88,
     "ambiguous": 0,
-    "unmatched": 54
+    "unmatched": 63
   },
   "movies": {
     "454639": {
@@ -25,8 +25,8 @@
       ]
     },
     "969681": {
-      "good": 40,
-      "ok": 14,
+      "good": 36,
+      "ok": 13,
       "bad": 6,
       "posts": [
         {
@@ -107,6 +107,13 @@
           "push": 19
         },
         {
+          "tag": "好雷",
+          "title": "[好雷] 《橡樹街末日》嘻嘻、不嘻嘻",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787674074.A.985.html",
+          "date": "8/26",
+          "push": 13
+        },
+        {
           "tag": "普雷",
           "title": "[普雷] 橡樹街末日-33年來最精緻的B級恐龍電影",
           "url": "https://www.ptt.cc/bbs/movie/M.1787035040.A.23E.html",
@@ -137,16 +144,9 @@
         {
           "tag": "普雷",
           "title": "[普雷] 橡樹街末日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786521035.A.9D5.html",
-          "date": "8/12",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787197717.A.292.html",
+          "date": "8/20",
           "push": 5
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 《橡樹街末日》嘻嘻、不嘻嘻",
-          "url": "https://www.ptt.cc/bbs/movie/M.1787674074.A.985.html",
-          "date": "8/26",
-          "push": 4
         }
       ]
     },
@@ -165,7 +165,7 @@
       ]
     },
     "1288445": {
-      "good": 1,
+      "good": 2,
       "ok": 0,
       "bad": 1,
       "posts": [
@@ -175,6 +175,13 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787140352.A.0F6.html",
           "date": "8/19",
           "push": 31
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 玩命航線",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787726278.A.AD6.html",
+          "date": "8/26",
+          "push": 14
         },
         {
           "tag": "好雷",
@@ -195,7 +202,7 @@
           "title": "[普雷] 陰兒房：穿越陰深處",
           "url": "https://www.ptt.cc/bbs/movie/M.1787475369.A.A84.html",
           "date": "8/23",
-          "push": 3
+          "push": 5
         }
       ]
     },
@@ -276,66 +283,17 @@
         }
       ]
     },
-    "1368337": {
-      "good": 10,
+    "1384216": {
+      "good": 1,
       "ok": 0,
-      "bad": 1,
+      "bad": 0,
       "posts": [
         {
-          "tag": "負雷",
-          "title": "[負雷] 奧德賽 感覺諾蘭說故事能力下降了",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785766692.A.DFA.html",
-          "date": "8/03",
-          "push": 45
-        },
-        {
           "tag": "好雷",
-          "title": "[好雷] 《奧德賽》禮崩樂壞的世界",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785865780.A.300.html",
-          "date": "8/05",
-          "push": 26
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 奧德賽 - 尤利西斯的奇幻漂流",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786947242.A.44C.html",
-          "date": "8/17",
-          "push": 8
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 奧德賽：英雄無歸",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785908897.A.AA8.html",
-          "date": "8/05",
-          "push": 7
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 奧德賽",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785983756.A.36E.html",
-          "date": "8/06",
-          "push": 6
-        },
-        {
-          "tag": "好雷",
-          "title": "[ 好雷] 奧德賽imax",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785922858.A.E4E.html",
-          "date": "8/05",
-          "push": 6
-        },
-        {
-          "tag": "好雷",
-          "title": "[ 好雷] 奧德賽 1997 與 諾蘭版雷",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785679230.A.3CF.html",
-          "date": "8/02",
-          "push": 6
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 奧德賽演義",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786005634.A.D51.html",
-          "date": "8/06",
-          "push": 2
+          "title": "[好雷] 《寂地》充滿詩意的末日公路電影",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787365143.A.B5B.html",
+          "date": "8/22",
+          "push": 5
         }
       ]
     },
