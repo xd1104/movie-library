@@ -10,11 +10,16 @@
 
    ⭐ 這一整份只做「開場那一幕」，不碰 app 內部任何其他地方。
 
-   接法（順序很重要）：
+   接法（順序很重要，完整版在 motion/README.md §1）：
+     <style> …關鍵路徑 CSS… </style>                    ← 必須在所有樣式表 <link> 之前
      <link rel="stylesheet" href="motion/motion.css">   ← token 在這，必須在前
      <link rel="stylesheet" href="motion/splash.css">
-     <style> :root{ --splash-bg:#xxxxxx; ... } html{background:var(--splash-bg);} </style>
+     <style> :root{ --splash-bg:… } </style>            ← 落地值，必須在這支之後才蓋得過
      <script src="motion/splash.js"></script>           ← 必須是 head 裡的同步 script
+
+   ⚠️ 上面那兩塊 <style> 的位置各有理由，不要合併也不要對調：
+      前面那塊是「外部 CSS 全掛時第一次繪製仍然是深色」的保險，它刻意不宣告任何 --splash-* 變數；
+      後面那塊才是落地值，搬到 <link> 前面就會被下面 :root 的範本預設值蓋掉。
    ============================================================ */
 
 
