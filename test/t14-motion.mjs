@@ -37,6 +37,9 @@ const NOWS = s => s.replace(/\s+/g, "");
 
 /* 從 index.html 裡把那段 inline 的 SPLASH_CONFIG 挖出來（要在 jsdom 裡真的跑它） */
 const CFG_SRC = (/<script>\s*([\s\S]*?window\.SPLASH_CONFIG[\s\S]*?)<\/script>/.exec(IDX) || [])[1] || "";
+/* index.html 裡**每一塊** <style>（v1.4.1 起有兩塊：關鍵路徑 CSS ＋ 開場落地值）。
+   任何「inline 樣式裡有沒有 X」的斷言都要掃全部，不可以只抓第一塊。 */
+const STYLE_BLOCKS = [...IDX.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]);
 
 /* WCAG 對比度（跟 splash.js 的 relLum 同一套，但這裡是「獨立實作」，
    刻意不從 splash.js 匯入——用被測程式自己的算式去驗自己，等於什麼都沒驗） */
@@ -108,13 +111,19 @@ section("61. 開場外觀＝這支 App 自己的品牌（不是範本的預設�
      「splash.js 載不到但 splash.css 載到了」的那一次，畫面上就會出現別人家的品牌。
      所以這裡不是列白名單，是把 splash.css 宣告的每一個都掃出來逐一驗。
      唯一的例外是 --splash-on-accent：它刻意由 onColor() 算，不是設定項。 */
-  const styleBlock = (/<style>([\s\S]*?)<\/style>/.exec(IDX) || ["", ""])[1];
-  const styleCss = noComment(styleBlock);   /* 註解裡也會寫到「範本」與 --splash-bg，一定要先剝掉 */
+  /* ⚠️ 掃**全部**的 <style>，不是只看第一個：v1.4.1 在 <link> 之前多了一塊
+     「關鍵路徑 CSS」（見 §75），只看第一塊的話這條就會掃錯地方。 */
+  const styleCss = noComment(STYLE_BLOCKS.join("\n"));   /* 註解裡也會寫到「範本」與 --splash-bg，一定要先剝掉 */
   const declared = [...new Set([...noComment(SPLASHCSS).matchAll(/(--splash-[a-z-]+)\s*:/g)].map(m => m[1]))];
   ok(declared.length >= 6, "★ splash.css 宣告了 " + declared.length + " 個 --splash-* 變數（少於 6 就是掃描壞了）");
   for (const v of declared) {
     if (v === "--splash-on-accent") {
-      ok(styleCss.indexOf(v) < 0, "★ " + v + " 刻意不在落地設定裡（由 onColor 算）");
+      /* ⚠️ 這條要驗的是「它不是**設定項**」，不是「這個名字不准出現」。
+         v1.4.1 起關鍵路徑那塊會用 var(--splash-on-accent) **引用**它（值仍然只有 onColor 算得出來），
+         所以判準精確化成「不可以有宣告」——`--splash-on-accent:` 或 `--splash-on-accent :`。
+         （引用不會讓它變成可調的旋鈕；宣告才會。） */
+      ok(!new RegExp(v + "\\s*:").test(styleCss),
+        "★ " + v + " 刻意不在落地設定裡（沒有任何一塊 <style> 宣告它，值由 onColor 算）");
       continue;
     }
     ok(styleCss.indexOf(v + ":") >= 0, "★ " + v + " 在 index.html 被蓋成我們自己的品牌");
@@ -379,11 +388,20 @@ section("71. 開場：冷啟動播、收得掉、收掉之後從 DOM 移除");
   ok(w.document.documentElement.style.getPropertyValue("--splash-glyph") === '"雷"', "★ 符號也是");
   await tick(w, 400);
   ok(!!d.getElementById("splash"), "★ 資料還沒到（400ms）時開場還在，蓋住等待");
+  /* ⭐ 800ms 這一刀是專門用來釘住「最短顯示是 950 不是 650」的：
+     650 的話這個時間點開場已經在收場動畫的尾巴、甚至已經 remove 掉了。 */
+  await tick(w, 400);
+  ok(!!d.getElementById("splash"),
+    "★ 800ms 時開場仍在畫面上（最短顯示 950ms —— 動作 640ms 做完之後還要有一拍定格）");
   await tick(w, 900);
   ok(!d.getElementById("splash"), "★ 資料到了就收，而且是從 DOM remove 掉（不是 hidden）");
   ok(d.querySelectorAll(".row[data-open]").length === 6, "★ 收掉之後片單是好的（開場沒有拖慢也沒有擋住）");
   ok(w.Splash.state().dismissed === true, "state() 也說收掉了");
-  ok(w.Splash.state().elapsed >= 650, "★ 最短顯示 650ms 有守住（實際 " + w.Splash.state().elapsed + "ms）");
+  /* 直接讀模組自己回報的常數，不用時間去推——時間會被機器忙碌度影響，這條不會 */
+  ok(w.Splash.state().minShow === 950,
+    "★ 最短顯示釘死在 950ms（Benson 2026-08-26 拍板：多一拍定格；**不是**把動作放慢）"
+    + "，實際 " + w.Splash.state().minShow);
+  ok(w.Splash.state().elapsed >= 950, "★ 最短顯示 950ms 有守住（實際 " + w.Splash.state().elapsed + "ms）");
 }
 
 section("71b. 熱啟動不重播（切分頁、返回、重新整理同一個 session）");
@@ -478,8 +496,11 @@ section("72. 符號字色由 onColor() 算，不是設定項，也不可以寫�
     ok(/^#[0-9a-f]{6}$/i.test(on), "算得出字色：" + acc + " → " + on + "（" + why + "）");
     ok(cr >= 3, "★ " + acc + " 上的符號對比 " + cr.toFixed(2) + ":1 ≥ 3（" + why + "）");
   }
-  ok(!/--splash-on-accent/.test(CFG_SRC) && !/on-accent/.test((/<style>([\s\S]*?)<\/style>/.exec(IDX) || ["", ""])[1]),
-    "★ 落地設定裡沒有這個色票（多一個色票就多一種「調成看不見」的可能）");
+  /* ⚠️ 掃**全部** <style>（v1.4.1 起有兩塊），只看第一塊的話這條會漏。
+     判準是「沒有人宣告它」——引用（var(--splash-on-accent)）是允許的，那不會讓它變成旋鈕。 */
+  ok(!/--splash-on-accent/.test(CFG_SRC) && !STYLE_BLOCKS.some(b => /--splash-on-accent\s*:/.test(b)),
+    "★ 沒有任何地方把這個色票宣告成落地設定（多一個可調色票就多一種「調成看不見」的可能），"
+    + "掃了 SPLASH_CONFIG ＋ 全部 " + STYLE_BLOCKS.length + " 塊 <style>");
   ok(/setVar\("--splash-on-accent", onColor\(look\.accent\)\)/.test(SPLASHJS), "★ 它是 onColor(accent) 算出來的");
 }
 
@@ -510,12 +531,16 @@ section("73. 鑰匙圈讀外觀：快取優先、背景更新、下次冷啟動�
     });
   }
   const CK = "splash:movie-library";
+  /* 讀鑰匙圈是在開場收掉之後才發動的：MIN_SHOW 950 → 收場 OUT_MS+60=400 → afterSplash 再等 400。
+     所以要等到 1750ms 之後才會有結果，這裡取 2100 留餘裕。
+     ⚠️ 這個數字跟著 splash.js 的 MIN_SHOW 走 —— 改 MIN_SHOW 要回來看這一行。 */
+  const KR_WAIT = 2100;
 
   /* ① 正常：讀得到 → 寫進快取，但這一次的畫面不可以中途換字 */
   {
     const { w } = await krBoot("ok");
     ok(w.document.documentElement.style.getPropertyValue("--splash-name") === '"好雷嗎?"', "開場用的是內建預設");
-    await tick(w, 1600);
+    await tick(w, KR_WAIT);
     ok(w.document.documentElement.style.getPropertyValue("--splash-name") === '"好雷嗎?"',
       "★ 讀到新名字之後，這一次的畫面**沒有**中途換字（刻意的：下次冷啟動才生效）");
     const c = JSON.parse(w.localStorage.getItem(CK) || "null");
@@ -534,13 +559,13 @@ section("73. 鑰匙圈讀外觀：快取優先、背景更新、下次冷啟動�
   /* ③ 有登記、但沒有 splash 欄位 ＝「我不要自訂了」→ 清掉快取 */
   {
     const { w } = await krBoot("nosplash", { [CK]: JSON.stringify({ name: "舊的" }) });
-    await tick(w, 1600);
+    await tick(w, KR_WAIT);
     ok(w.localStorage.getItem(CK) === null, "★ 清掉快取 ⇒ 下次冷啟動回到內建預設");
   }
   /* ④ 壞 JSON／沒網路／這個 app 沒登記 → 完全無感，保留舊快取 */
   for (const [mode, why] of [["bad", "壞掉的 JSON"], ["net", "沒網路"], ["other", "keyring 上沒登記這個 app"]]) {
     const { w, d } = await krBoot(mode, { [CK]: JSON.stringify({ name: "舊的" }) });
-    await tick(w, 1600);
+    await tick(w, KR_WAIT);
     const c = JSON.parse(w.localStorage.getItem(CK) || "null");
     ok(c && c.name === "舊的", "★ " + why + " → 保留舊快取（那是「沒有資訊」，不是「叫我還原」）");
     ok(d.querySelectorAll(".row[data-open]").length === 6, "　 而且 App 完全不受影響");
@@ -581,6 +606,99 @@ section("74. splash.js／splash.css 是範本的複製品，不可以在這裡�
       "⚠️ 同上，強檢查沒有執行：只確認 splash.css 仍是範本原樣（落地值在 index.html）");
   }
   ok(!/kr-/.test(MOTION) && !/kr-/.test(SPLASHCSS), "新的兩支 CSS 一條 kr- 規則都沒有（鑰匙圈公版自己帶樣式）");
+}
+
+/* ================================================================
+   §75 第一次繪製必定是深色（v1.4.1 白閃修正）
+   ------------------------------------------------------------
+   Benson 2026-08-26 回報：真 iPhone 從主畫面開 PWA「先閃一下白色，才開始播開場」。
+   iOS 的順序是：系統開場（manifest.background_color ＋ icon）→ 建 WKWebView
+   → **第一次繪製之前 WebView 是白的** → 頁面第一次繪製。
+   我們控制得了的只有兩件事：①第一次繪製多快 ②第一次繪製是什麼顏色。
+
+   ②本來完全靠外部檔案：底色寫在 css/splash.css（第三支 CSS）與 css/app.css 的 body 背景。
+   三支 CSS 只要有一支沒到位（離線、SW 殼快取沒建完、部署漏檔），第一次繪製就是純白。
+   2026-08-26 用本機真 Chrome（--headless=new ＋ CDP 逐幀取樣，量首幀像素）實測：
+     三支 CSS 全部 404 時 —— 沒有 inline 關鍵 CSS 的首幀是 **#ffffff**，有的話是 **#0b0d12**。
+   所以現在 index.html 的 <head> 最前面有一塊「關鍵路徑 CSS」，這一節就是在守它。
+   ================================================================ */
+section("75. 第一次繪製必定是深色：關鍵路徑 CSS 要 inline 在所有 <link> 之前");
+{
+  const links = [...IDX.matchAll(/<link rel="stylesheet"[^>]*>/g)].map(m => m[0]);
+  ok(STYLE_BLOCKS.length >= 2 && links.length >= 3,
+    "★ 尺沒壞：掃到 " + STYLE_BLOCKS.length + " 塊 <style>、" + links.length + " 支外部樣式表");
+
+  const iStyle = IDX.indexOf("<style>");
+  const iLink = IDX.indexOf('<link rel="stylesheet"');
+  ok(iStyle >= 0 && iLink >= 0 && iStyle < iLink,
+    "★ 第一塊 <style>（關鍵路徑）排在第一支 <link rel=stylesheet> 之前");
+
+  const CRIT = noComment(STYLE_BLOCKS[0]);
+
+  /* ① 底色：一定要寫在 html 上（body 的背景在 overscroll 時救不了，而且 app.css 沒到就沒有） */
+  const htmlBg = /html[^{]*\{[^}]*background:\s*var\(--splash-bg,\s*(#[0-9a-fA-F]{3,8})\)/.exec(CRIT);
+  ok(!!htmlBg, "★ 關鍵路徑塊裡有 html 的背景色，而且走 var(--splash-bg, 後備值)");
+  ok(htmlBg && htmlBg[1] === MF.background_color,
+    "★ 後備色 " + (htmlBg && htmlBg[1]) + " === manifest.background_color " + MF.background_color
+    + "（不一致＝白閃換成色差，一樣看得出來）");
+  ok(htmlBg && htmlBg[1] === (/<meta name="theme-color" content="(#[0-9a-fA-F]{3,8})">/.exec(IDX) || [])[1],
+    "★ 後備色也 === <meta theme-color>");
+
+  /* ② 蓋滿：外部 CSS 沒到時，#splash 仍然要是覆蓋全螢幕的那一層 */
+  const spRule = /#splash\s*\{([\s\S]*?)\}/.exec(CRIT);
+  ok(!!spRule, "★ 關鍵路徑塊裡有 #splash 規則");
+  const sp = spRule ? NOWS(spRule[1]) : "";
+  ok(/position:fixed/.test(sp) && /inset:0/.test(sp),
+    "★ #splash 一出現就蓋滿（position:fixed ＋ inset:0）");
+  ok(/z-index:200/.test(sp), "★ 疊在 app 上面（z-index:200，跟 splash.css 一致）");
+  const spBgFb = /background:\s*var\(--splash-bg,\s*(#[0-9a-fA-F]{3,8})\)/.exec(spRule ? spRule[1] : "");
+  ok(!!spBgFb, "★ #splash 自己也有底色（不靠繼承）");
+  ok(spBgFb && spBgFb[1] === MF.background_color,
+    "★ #splash 的後備底色 " + (spBgFb && spBgFb[1]) + " 也 === manifest.background_color");
+
+  /* ③ 不可以再拉任何外部資源，否則等於沒有脫離關鍵路徑 */
+  ok(!/@import/.test(CRIT) && !/url\(/.test(CRIT),
+    "★ 關鍵路徑塊沒有 @import／url()（它必須完全不依賴網路）");
+
+  /* ④ 全掃描：#splash 標記裡用到的每一個 sp-* class，關鍵路徑塊都要畫得出來。
+     （不是列白名單——上一輪範本的退件全是「保證涵蓋範圍比宣稱的小」。） */
+  const spClasses = [...new Set([...IDX.matchAll(/class="(sp-[a-z-]+)"/g)].map(m => m[1]))];
+  ok(spClasses.length >= 5, "★ 尺沒壞：#splash 標記裡掃到 " + spClasses.length + " 個 sp-* class："
+    + spClasses.join(", "));
+  /* 豁免：.sp-ring 是第二拍的光環，靜態 opacity 本來就是 0；
+     沒有規則時它只是一個看不見的空 div，不影響第一幀。豁免名單長度要斷言（擋偷加）。 */
+  const EXEMPT = ["sp-ring"];
+  ok(EXEMPT.length === 1, "★ 豁免名單只有 1 個（" + EXEMPT.join(",") + "）——要加請先想清楚為什麼");
+  for (const c of spClasses) {
+    if (EXEMPT.indexOf(c) >= 0) {
+      ok(CRIT.indexOf("." + c + "{") < 0 && CRIT.indexOf("." + c + " {") < 0,
+        "★ ." + c + " 刻意不進關鍵路徑（第一幀它是不可見的）");
+      continue;
+    }
+    ok(new RegExp("\\." + c + "\\s*[,{:]").test(CRIT),
+      "★ ." + c + " 在關鍵路徑塊裡有規則（外部 CSS 全掛也畫得出第一幀）");
+  }
+
+  /* ⑤ 符號的字色：只准引用 onColor 算出來的值，不可以在這裡寫死一個色碼
+     （寫死＝同一條規則活在兩個地方，鑰匙圈換色時一定分岔，而且分岔的那一份沒有對比度下界） */
+  const glyphRule = /\.sp-glyph\s*\{([\s\S]*?)\}/.exec(CRIT);
+  ok(!!glyphRule, "★ 關鍵路徑塊裡有 .sp-glyph 規則");
+  const gl = glyphRule ? NOWS(glyphRule[1]) : "";
+  ok(/color:var\(--splash-on-accent\)/.test(gl),
+    "★ 符號字色是 var(--splash-on-accent)（值由 splash.js 的 onColor 算，會跟著鑰匙圈換色）");
+  ok(!/color:#[0-9a-fA-F]{3,8}/.test(gl),
+    "★ 而且沒有在這裡寫死任何字色色碼");
+
+  /* ⑥ 符號與名字的文字：外部 CSS 掛掉時也要是我們自己的品牌，不可以是空的或範本的 */
+  ok(/content:var\(--splash-glyph,\s*"雷"\)/.test(CRIT), "★ 符號的後備值是「雷」");
+  ok(/content:var\(--splash-name,\s*"好雷嗎\?"\)/.test(CRIT), "★ 名字的後備值是「好雷嗎?」");
+  ok(!/範|#241f1b|#b2592b/.test(CRIT), "★ 關鍵路徑塊裡沒有範本的品牌");
+
+  /* ⑦ 負控組：證明上面那些比對真的會回 false，不是恆真 */
+  const FAKE = "#splash{color:red;}";
+  ok(!/html[^{]*\{[^}]*background:\s*var\(--splash-bg,/.test(FAKE),
+    "負控：一段沒有 html 背景的 CSS，比對結果必須是「不合格」");
+  ok(!/position:fixed/.test(NOWS(FAKE)), "負控：沒有 position:fixed 的規則也必須判成不合格");
 }
 
 process.exit(summary() ? 1 : 0);

@@ -12,6 +12,49 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="好雷嗎">
+<!-- ⭐⭐ 關鍵路徑：第一次繪製就必須是深色的開場。這一塊刻意排在所有 <link> 之前，
+     而且**不依賴任何外部檔案**（顏色走 var(--splash-*, 後備值)）。
+     為什麼要有它：iPhone 從主畫面開 PWA 的順序是
+       系統開場（manifest.background_color ＋ icon）→ 建 WKWebView → **這裡是白的** → 頁面第一次繪製。
+     三支外部 CSS 只要有一支沒到位（離線、SW 殼快取沒建完、部署漏檔），第一次繪製就會是**純白**。
+     2026-08-26 用本機真 Chrome（--headless=new + CDP 逐幀取樣）實測：
+       三支 CSS 全部 404 時，**沒有這一塊的首幀是 #ffffff，有這一塊是 #0b0d12**。
+     ⚠️ 變數的**落地值不在這裡**，在下面那一塊（它必須排在 splash.css 之後才蓋得過範本的預設值
+        「範／App 範本／#241f1b」）。這裡只放「連 splash.css 都沒載到」時要用的後備字面值。
+     ⚠️ 符號的字色刻意不在這裡：它是 js/splash.js 的 onColor() 算出來的，不是設定項。 -->
+<style>
+  html:not([data-splash="off"]){background:var(--splash-bg,#0b0d12);}
+  #splash{
+    position:fixed; inset:0; z-index:200; overflow:hidden;
+    background:var(--splash-bg,#0b0d12); color:var(--splash-ink,#f3f5f9);
+    user-select:none; -webkit-user-select:none;
+  }
+  html[data-splash="off"] #splash{display:none;}
+  .sp-core{position:absolute; inset:0;}
+  /* 第一幀＝靜止的置中符號方塊，位置與尺寸逐字照 css/splash.css（對得準系統開場的 icon） */
+  .sp-glyph{
+    position:absolute; left:50%; top:50%;
+    width:76px; height:76px; margin:-38px 0 0 -38px;
+    border-radius:22px; background:var(--splash-accent,#ffc14d);
+    /* ⚠️ 字色只「引用」不「宣告」：值是 js/splash.js 的 onColor(accent) 在 <head> 就算好寫進
+       :root 的 inline style 的（跟著鑰匙圈換色，最差對比有下界）。
+       這裡如果寫死一個色碼，就變成同一條規則活在兩個地方，換色時一定分岔。
+       splash.js 也沒載到的話這行會失效、退回繼承 --splash-ink——那是雙重降級，可以接受。 */
+    color:var(--splash-on-accent);
+    display:flex; align-items:center; justify-content:center;
+    font-size:34px; font-weight:800; letter-spacing:.02em;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  }
+  .sp-glyph::before{content:var(--splash-glyph,"雷");}
+  .sp-below{
+    position:absolute; left:0; right:0; top:50%;
+    margin-top:58px; padding:0 26px; text-align:center;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  }
+  .sp-name{font-size:20px; font-weight:700; letter-spacing:-.01em; line-height:1.3;}
+  .sp-name::before{content:var(--splash-name,"好雷嗎?");}
+  .sp-tag{display:none;}
+</style>
 <link rel="stylesheet" href="./css/app.css">
 <!-- 動效基調（沉穩）＋ 開場畫面（印記）。
      ⚠️ 順序：app.css → motion.css → splash.css。
@@ -23,6 +66,9 @@
 <link rel="stylesheet" href="./css/splash.css">
 <style>
   /* ⭐ 開場外觀的落地值就這一塊（其餘一律不用動 css/splash.css）。
+     ⚠️ 這一塊**必須留在 css/splash.css 的 <link> 後面**：splash.css 是範本複製品，
+        它的 :root 預設值是範本自己的品牌，同權重時後宣告者勝，搬到前面去就會被它蓋掉。
+        （上面那塊關鍵路徑 CSS 才是排在 <link> 之前的，那塊刻意不宣告任何 --splash-*。）
      ⚠️ --splash-bg 必須**逐字**等於 manifest.webmanifest 的 background_color
         與上面那行 meta theme-color，否則 iPhone 從主畫面開 App 會白閃一下
         （iOS 會先畫一張用 background_color 的系統開場，關不掉）。

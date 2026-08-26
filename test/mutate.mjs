@@ -236,6 +236,18 @@ const M = [
 `, ``],
   ["X14 拿掉開場的收場保險絲（ready 不來就永遠卡著）", "js/splash.js", `  W.setTimeout(function () { dismiss(); }, FUSE);\n`, ``],
   ["X15 splash.js 加了 defer（會先畫預設值再跳成新名字）", "index.html", `<script src="./js/splash.js"></script>`, `<script defer src="./js/splash.js"></script>`],
+  /* ---- v1.4.1 白閃修正：第一次繪製必定是深色（t14 §75 在守） ---- */
+  ["X16 拿掉關鍵路徑的 html 底色（CSS 沒到位時第一次繪製會是純白）", "index.html",
+    `  html:not([data-splash="off"]){background:var(--splash-bg,#0b0d12);}\n`, ``],
+  ["X17 關鍵路徑的 #splash 不再蓋滿（會透出沒套樣式的 app 內容）", "index.html",
+    `    position:fixed; inset:0; z-index:200; overflow:hidden;`, `    overflow:hidden;`],
+  ["X18 關鍵路徑的後備底色跟 manifest 不一致（白閃換成色差）", "index.html",
+    `  html:not([data-splash="off"]){background:var(--splash-bg,#0b0d12);}`,
+    `  html:not([data-splash="off"]){background:var(--splash-bg,#0c0d12);}`],
+  ["X19 開場最短顯示調回 650（動作剛做完就走，沒有那一拍定格）", "js/splash.js",
+    `  var MIN_SHOW = REDUCE ? 300 : 950;`, `  var MIN_SHOW = REDUCE ? 300 : 650;`],
+  ["X20 關鍵路徑把符號字色寫死（不再跟著 onColor，鑰匙圈換色就分岔）", "index.html",
+    `    color:var(--splash-on-accent);`, `    color:#ffffff;`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 
