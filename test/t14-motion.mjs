@@ -556,7 +556,13 @@ section("73. 鑰匙圈讀外觀：快取優先、背景更新、下次冷啟動�
    ================================================================ */
 section("74. splash.js／splash.css 是範本的複製品，不可以在這裡分岔");
 {
-  const h = x => crypto.createHash("sha256").update(x).digest("hex");
+  /* ⚠️ 比對前一定要把換行正規化成 LF。
+     這個 repo 是 CRLF（Windows 的 core.autocrlf），app-template 用 .gitattributes 強制 LF，
+     所以 git 只要重新簽出一次（rebase、切分支、重 clone），同一份檔案的位元組就會不一樣，
+     這條會紅在「行尾」而不是「程式分岔」——2026-08-26 rebase 之後就真的紅了一次。
+     它要守的是「程式沒有分岔」，不是「行尾一樣」。
+     （同一個根因也讓 test/mutate.mjs 的 50 條突變靜默失效過，見那支檔案的註解。） */
+  const h = x => crypto.createHash("sha256").update(String(x).replace(/\r\n/g, "\n")).digest("hex");
   /* ⚠️ 只用相對路徑。原本這裡還列了一條寫死的絕對路徑（機器綁定），
      而且找不到正本時會**靜默**退成弱斷言——換一台機器或 CI 上跑，
      「兩邊沒分岔」這件事就沒有人在驗，輸出卻仍然一片綠。
