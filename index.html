@@ -208,14 +208,24 @@
   <div class="toast" id="toast"></div>
 </div>
 
+<!-- ⭐ 這六支一律 defer（2026-08-26 量出來的，不是照本宣科）：
+     它們加起來 ~208KB，而且第一次繪製一個位元組都用不到（畫面完全被 #splash 蓋住）。
+     不加 defer 的話它們會用「解析器阻塞腳本」的高優先權去搶頻寬，
+     把第一次繪製真正需要的 index.html／css／splash.js 擠到後面。
+     本機真 Chrome ＋ CDP 逐幀取樣、每次取樣前清光 SW/快取/儲存空間（＝Safari 第一次開）：
+       Slow-3G 冷啟動 first paint 中位 2670ms → 2225ms（-420ms，三輪重現）
+       4G 冷啟動 295→277ms、走 SW 熱啟動 227→220ms（都在雜訊內，沒有退步）
+     ⚠️ js/splash.js 不在這一批裡，它必須留在 <head> 當同步腳本（t14 §62 在擋）：
+        它要在 body 開始解析前把外觀寫成 CSS 變數，否則會「先畫預設再中途換字」。
+     ⚠️ defer 會保序執行，所以鑰匙圈仍然排在我們自己的 js 之前。 -->
 <!-- 鑰匙圈（跨 App 身分模組）：一定要在我們自己的 js 之前載入。
      它是 xd1104/keyring 的 client/keyring-unlock.js 複製過來的，**不要在這裡改它**，
      要改去那個 repo 改（我們這邊也不可以寫任何 kr- 開頭的 CSS）。 -->
-<script src="./js/keyring-unlock.js"></script>
-<script src="./js/config.js"></script>
-<script src="./js/store.js"></script>
-<script src="./js/api.js"></script>
-<script src="./js/ui.js"></script>
-<script src="./js/app.js"></script>
+<script defer src="./js/keyring-unlock.js"></script>
+<script defer src="./js/config.js"></script>
+<script defer src="./js/store.js"></script>
+<script defer src="./js/api.js"></script>
+<script defer src="./js/ui.js"></script>
+<script defer src="./js/app.js"></script>
 </body>
 </html>

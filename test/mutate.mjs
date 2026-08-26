@@ -174,7 +174,7 @@ const M = [
     var was = state.view;`, `  function showHome(restoreScroll) {
     var was = state.view;
     if (krOn()) krTry(function () { Keyring.maybeIntro(); });`],
-  ["K10 index.html 沒載入鑰匙圈模組", "index.html", `<script src="./js/keyring-unlock.js"></script>
+  ["K10 index.html 沒載入鑰匙圈模組", "index.html", `<script defer src="./js/keyring-unlock.js"></script>
 `, ``],
   ["K11 鑰匙圈模組沒進 sw.js 殼快取", "sw.js", `  "./js/keyring-unlock.js",
 `, ``],
@@ -248,6 +248,11 @@ const M = [
     `  var MIN_SHOW = REDUCE ? 300 : 950;`, `  var MIN_SHOW = REDUCE ? 300 : 650;`],
   ["X20 關鍵路徑把符號字色寫死（不再跟著 onColor，鑰匙圈換色就分岔）", "index.html",
     `    color:var(--splash-on-accent);`, `    color:#ffffff;`],
+  /* ---- v1.4.2 關鍵路徑只留必要的東西（t14 §77／t13 在守） ---- */
+  ["X21 app.js 拿掉 defer（變回解析器阻塞腳本，會去搶第一次繪製的頻寬）", "index.html",
+    `<script defer src="./js/app.js"></script>`, `<script src="./js/app.js"></script>`],
+  ["X22 鑰匙圈拿掉 defer（載入形態跟 config.js 不一致 ⇒ 執行順序會反過來）", "index.html",
+    `<script defer src="./js/keyring-unlock.js"></script>`, `<script src="./js/keyring-unlock.js"></script>`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

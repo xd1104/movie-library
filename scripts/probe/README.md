@@ -25,11 +25,23 @@ node scripts/probe/bench.mjs --reps=15 --cpu=4 --net=none --sw=1 -- 8083:改後 
 node scripts/probe/shot.mjs http://127.0.0.1:8083/index.html 450
 ```
 
-`bench.mjs` 參數：`--reps` 每個目標跑幾次／`--cpu` CPU 節流倍率／`--net none|4g|3g`／
-`--sw=1` 先裝好 Service Worker 再量（＝ PWA 冷啟動）、`--sw=0` 第一次進站／`--dev` devtools port。
+`bench.mjs` 參數：`--reps` 每個目標跑幾次／`--cpu` CPU 節流倍率／
+`--net none|4g|3g|slow3g`（`4g` 1.18MB/s・20ms、`3g` 89.6KB/s・300ms、`slow3g` 50KB/s・400ms）／
+`--wait` 每次取樣等多久（慢網路要拉長，不然開場停留量不到）／`--dev` devtools port，
+以及**兩種啟動情境**（很重要，結論會完全相反）：
+
+| 旗標 | 情境 | 對應到 Benson 的哪一次 |
+|---|---|---|
+| `--sw=1` | 先幫每個目標裝好 Service Worker 再量 | 已加到主畫面、天天在用的 PWA（熱啟動） |
+| `--cold=1` | **每一次取樣前**把該來源的 SW／Cache Storage／localStorage／HTTP 快取全清掉 | 用 Safari 第一次開那個網址、或快取被清掉 |
+
+⚠️ `--sw=0` **不等於冷啟動**：同一個 profile 會累積快取與 SW，只有第一次是真的冷。
+要量冷啟動一定要用 `--cold=1`。
 
 輸出欄位：`FP` first paint（相對導航開始，ms）、`首幀色` 第一幀左上角的實際像素、
-`首幀ms` 第一張螢幕影格的時間、`開場停留` `#splash` 從出現到從 DOM 消失。
+`首幀ms` 第一張螢幕影格的時間、`開場停留` `#splash` 從出現到從 DOM 消失、
+**`SW?`／`下載KB` 是尺的自證**——`--cold=1` 時 `SW?` 必須是 `no`、`下載KB` 必須 > 0，
+不然就是沒真的清乾淨（「以為在量冷啟動、其實量到熱啟動」不會有任何徵兆）。
 
 ## ⚠️ 三個雷（踩過才寫的）
 

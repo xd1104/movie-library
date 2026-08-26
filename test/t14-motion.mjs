@@ -701,4 +701,62 @@ section("75. 第一次繪製必定是深色：關鍵路徑 CSS 要 inline 在所
   ok(!/position:fixed/.test(NOWS(FAKE)), "負控：沒有 position:fixed 的規則也必須判成不合格");
 }
 
+/* ================================================================
+   §77 第一次繪製的關鍵路徑上，只准站著「第一次繪製真的需要的東西」
+   ----------------------------------------------------------------
+   2026-08-26 用本機真 Chrome（--headless=new ＋ CDP 逐幀取樣、
+   每次取樣前把 SW／Cache Storage／localStorage／HTTP 快取全清乾淨
+   ＝ Benson 用 Safari 第一次開那個網址）量出來的，不是照本宣科：
+     body 那六支 js 加起來 ~208KB，第一次繪製一個位元組都用不到
+     （畫面完全被 #splash 蓋住，而 #splash 的長相在關鍵路徑 CSS 裡）。
+     不加 defer 的話它們會用「解析器阻塞腳本」的高優先權去搶頻寬 ⇒
+     Slow-3G 冷啟動 first paint 中位 2670ms → 2225ms（-420ms，三輪重現）；
+     4G 冷啟動 295→277ms、走 SW 熱啟動 227→220ms（都在雜訊內，沒有退步）。
+   ⚠️ 掃描式斷言：把 index.html 裡每一個本站 <script src> 全抓出來逐一驗，
+      不是列白名單 —— 漏掉的那一支永遠不會有人發現。
+   ================================================================ */
+section("77. index.html 裡每一支本站 script 的載入形態（全掃描）");
+{
+  /* 字元類 [.] [/] 是刻意的（不需要跳脫字元也讀得懂）；先抓整個標籤再驗屬性，
+     不可以寫成「src 後面不准接 defer」——屬性順序一換就繞過去（X15 的教訓）。 */
+  const RE_SRC = new RegExp('<script[^>]*src="([.][/]js[/][^"]+)"[^>]*>', "g");
+  const tags = [...IDX.matchAll(RE_SRC)].map(m => ({ tag: m[0], src: m[1], at: m.index }));
+  ok(tags.length >= 7, "★ 尺沒壞：掃到 " + tags.length + " 支本站 script（少於 7 就是掃描壞了）："
+    + tags.map(t => t.src).join(", "));
+  const iHead = IDX.indexOf("</head>");
+  /* 用屬性 token 判形態，不用字串包含 —— "deferred" 之類的檔名不會誤判 */
+  const form = t => { const a = t.slice(7, -1).split(" ");
+    return a.indexOf("defer") >= 0 ? "defer" : (a.indexOf("async") >= 0 ? "async" : "sync"); };
+  /* 豁免只有一支：js/splash.js 必須是 <head> 裡的同步腳本（理由見 §62 ——
+     它要在 body 開始解析前把外觀寫成 CSS 變數，否則會「先畫預設再中途換字」）。
+     豁免名單長度要斷言（擋人把礙事的檔案偷加進來矇混）。 */
+  const EXEMPT = ["./js/splash.js"];
+  ok(EXEMPT.length === 1, "★ 豁免名單只有 1 個（" + EXEMPT.join(",") + "）——要加請先想清楚為什麼");
+  let nDefer = 0;
+  for (const t of tags) {
+    if (EXEMPT.indexOf(t.src) >= 0) {
+      ok(form(t.tag) === "sync" && t.at < iHead,
+        "★ " + t.src + " 是 <head> 裡的同步腳本（豁免的那一支）", t.tag);
+      continue;
+    }
+    ok(t.at > iHead, "★ " + t.src + " 在 </head> 之後（head 裡不留會擋解析的腳本）");
+    ok(form(t.tag) === "defer",
+      "★ " + t.src + " 是 defer（第一次繪製用不到它，不可以搶關鍵路徑的頻寬）", t.tag);
+    nDefer++;
+  }
+  ok(nDefer >= 6, "★ 真的逐一驗到 " + nDefer + " 支 defer（少於 6 代表迴圈根本沒跑進去）");
+  /* defer 之間保序，所以鑰匙圈仍然排在我們自己的 js 前面（t13 另有一條在守「形態要一致」） */
+  const iKr = tags.findIndex(t => t.src === "./js/keyring-unlock.js");
+  const iApp = tags.findIndex(t => t.src === "./js/app.js");
+  ok(iKr >= 0 && iApp >= 0 && iKr < iApp, "★ 鑰匙圈仍排在 app.js 之前（defer 會保序）");
+  /* 負控組①：form() 三種形態都分得出來，不是恆回 defer */
+  ok(form('<script src="./js/x.js"></script>') === "sync" &&
+     form('<script async src="./js/x.js"></script>') === "async" &&
+     form('<script defer src="./js/x.js"></script>') === "defer",
+    "負控：form() 三種形態都分得出來（尺沒壞）");
+  /* 負控組②：屬性順序換過的標籤一樣撈得到 */
+  ok(new RegExp('<script[^>]*src="([.][/]js[/][^"]+)"[^>]*>').test('<script defer src="./js/app.js"></script>'),
+    "負控：屬性順序換過的標籤一樣撈得到");
+}
+
 process.exit(summary() ? 1 : 0);

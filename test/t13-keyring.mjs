@@ -217,8 +217,22 @@ section("54. 我們對「模組正本」的假設（靜態，模組改版時會�
     "★ 假設四：公開值認的是 apps[] 裡的 public:true ＋ plain（跟 iv／cipher 分得開）");
 
   const idx = fs.readFileSync(R + "index.html", "utf8");
-  const iKr = idx.indexOf('<script src="./js/keyring-unlock.js">'), iCfg = idx.indexOf('<script src="./js/config.js">');
+  /* ⚠️ 尺不可以寫成整段字串比對：標籤上多一個屬性（例如 defer）就整條失效，
+     而且失效的方向是「安靜地判成找不到」。先抓整個標籤、再看它的屬性。
+     （字元類 [.] [/] 是刻意的：這裡不需要跳脫字元也讀得懂。） */
+  const tagOf = f => (new RegExp('<script[^>]*src="[.][/]js[/]' + f + '[.]js"[^>]*>').exec(idx) || [""])[0];
+  const tKr = tagOf("keyring-unlock"), tCfg = tagOf("config");
+  const iKr = idx.indexOf(tKr), iCfg = idx.indexOf(tCfg);
+  ok(!!tKr && !!tCfg, "撈得到兩個 script 標籤（尺沒壞）：" + tKr + " / " + tCfg);
   ok(iKr >= 0 && iCfg >= 0 && iKr < iCfg, "★ index.html 在我們自己的 js 之前載入模組（兩行都要在）");
+  /* ⭐ 真正保證執行順序的是「兩支的載入形態一樣」：defer 之間會保序、同步之間也會保序，
+     但一支 defer 一支同步就會反過來 —— 鑰匙圈會晚於 config.js 執行，
+     金鑰還沒塞回 localStorage，boot() 的自我體檢就會誤判成「還沒設定」。 */
+  const formOf = t => { const a = t.slice(7, -1).split(" "); return a.indexOf("defer") >= 0 ? "defer" : (a.indexOf("async") >= 0 ? "async" : "sync"); };
+  ok(formOf(tKr) === formOf(tCfg) && formOf(tKr) !== "async",
+    "★ 鑰匙圈與 config.js 的載入形態一致、而且不是 async（async 不保序）：" + formOf(tKr) + " / " + formOf(tCfg));
+  ok(formOf('<script src="./js/x.js"></script>') === "sync" && formOf('<script defer src="./js/x.js"></script>') === "defer",
+    "負控：formOf() 真的分得出同步與 defer（尺沒壞）");
   const sw = fs.readFileSync(R + "sw.js", "utf8");
   ok(/"\.\/js\/keyring-unlock\.js"/.test(sw.split("self.addEventListener")[0]), "★ 有進 sw.js 的殼快取清單");
   const css = fs.readFileSync(R + "css/app.css", "utf8");

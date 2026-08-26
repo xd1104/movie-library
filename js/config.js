@@ -3,7 +3,7 @@
    ⚠️ 這裡永遠不會有 API 金鑰。金鑰只存在使用者自己裝置的 localStorage。 */
 
 /* 唯一版本來源：改版就 +1，sw.js 的快取名稱會跟著換 */
-var HLM_VER = "1.4.1";
+var HLM_VER = "1.4.2";
 
 var HLM_CFG = {
   ver: HLM_VER,
