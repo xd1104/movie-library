@@ -108,6 +108,20 @@ html:not([data-splash="off"]){background:var(--splash-bg);}
    delay 期間套用 from-state ＝ 靜止的第一幀）。
 
    做對的時候，從主畫面開啟「看不出交接點」——那就是成功。
+
+   ⭐⭐ 2026-08-27 v1.6.1 追加的硬界線：**「第一次繪製的那一幀」必須逐條等於
+      「這裡每一條動畫的起始狀態」**。
+      理由：三支樣式表是非阻塞的（media="print" onload），所以
+        第一次繪製 → （幾十毫秒～數百毫秒）→ splash.css 才被套用 → 動畫**從頭開始跑**。
+      第一次繪製那一幀是 app 的**關鍵路徑 inline CSS** 畫的。它以前畫的是「完成態」
+      （符號實心、名字看得見）⇒ splash.css 一到就跳回起始狀態
+      ＝ 使用者看到「實心 →（跳）淡掉 → 再淡回來」、名字「出現 → 消失 → 再出現」。
+      深色版時代也有（名字早就是 1 → 0 → 1），只是深底＋深色字看不出來；
+      白起把底色變亮之後整個現形。
+      ⇒ 所以 app 的關鍵路徑塊現在畫的是**起始狀態**（見 index.html 那一塊），
+        而這裡每一條進場動畫的 fill-mode 必須是 `both`（起點交給靜態值、終點交給動畫）。
+      ⚠️ 加新的一拍時要同時做三件事：①這裡寫 keyframes ②關鍵路徑塊補上它的 from-state
+        ③`check-splash.js` 的「第一幀 ＝ 起始狀態」對照表會自動比對，缺一邊就紅。
    ============================================================ */
 .sp-core{position:absolute; inset:0;}
 
@@ -186,9 +200,18 @@ html:not([data-splash="off"]){background:var(--splash-bg);}
   to  {opacity:0;   transform:scale(2.05);}
 }
 
-/* 同一拍：名字在下方淡入 */
+/* 同一拍：名字在下方淡入。
+   ⚠️⚠️ fill-mode 是 `both` 不是 `backwards`（2026-08-27 v1.6.1，刻意偏離
+      「進場動畫一律 backwards」那條通則）。理由是**關鍵路徑 CSS 的第一幀必須等於
+      這條動畫的起始狀態**（`.sp-name{opacity:0}`），否則 splash.css 一套上來
+      名字會「先看得見 → 消失 → 再升起」。靜態值一旦變成起始狀態，
+      `backwards` 就撐不住終點了（動畫演完會退回 opacity:0 ＝ 名字自己不見）
+      ⇒ 只能用 `both`。
+      通則的理由是「forwards／both 會永久保留 transform ⇒ :active 失效」，
+      而 **#splash 全程不可互動**（§2 有 user-select:none、沒有任何按鈕），
+      所以那個代價在這裡是 0。這也是 §5 的收場一直都能用 forwards 的同一個理由。 */
 #splash .sp-name{
-  animation:sp-up var(--dur-3) var(--ease) backwards
+  animation:sp-up var(--dur-3) var(--ease) both
             calc(var(--sp-hold) + var(--dur-2));
 }
 @keyframes sp-up{
@@ -291,7 +314,9 @@ html[data-splash-intro="light"] #splash::before{
    蓋掉 §5 的「呼吸」—— 呼吸是為了在一大幕深色上製造第二拍，
    白起這一版的第二拍是底色本身在沉，再加呼吸會變成兩件事同時搶注意力。 */
 html[data-splash-intro="light"] #splash .sp-glyph{
-  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) backwards;
+  /* fill-mode `both` 的理由跟 §5 的名字一模一樣（第一幀 ＝ 起始狀態 ⇒ 靜態值是
+     opacity:0 ⇒ 終點只能靠動畫自己撐）。#splash 不可互動，代價是 0。 */
+  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) both;
 }
 @keyframes sp-emerge{
   from{opacity:0; transform:scale(var(--scale-in));}
@@ -305,7 +330,7 @@ html[data-splash-intro="light"] .sp-ring{ animation:none; }
 
 /* 7e. 名字：等底色沉到深色才出現（見上面的決定 ③） */
 html[data-splash-intro="light"] #splash .sp-name{
-  animation:sp-up var(--dur-3) var(--ease) backwards var(--sp-sink);
+  animation:sp-up var(--dur-3) var(--ease) both var(--sp-sink);
 }
 
 /* 7f. 減少動態：白起**整個關掉**，退回深色的第一幀。

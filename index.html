@@ -70,6 +70,30 @@
   /* 全掃描不是白名單：body 底下除了開場以外一律先壓住，
      以後多加一個浮動元素也不會漏 */
   html[data-cssgate] body > *:not(#splash){visibility:hidden;}
+  /* ⭐⭐ v1.6.1：開場**播放中**，App 內容一律不要畫出來。
+     ------------------------------------------------------------
+     為什麼加這一條：Benson 的螢幕錄影在「splash.css 被套用」的那兩格
+     （畫格 89–90）拍到畫面**下緣露出一條深色的 App 內容**（看得到電影卡片）。
+     時間點對得起來的原因是：閘門（data-cssgate）**正好就是在那一刻開的**
+     ——三支樣式表回報完成 → boot 開閘 → App 內容從 visibility:hidden 變成可見。
+     ⇒ 只要有任何一塊畫面沒被 #splash 蓋到，它就會在**那一格**從
+       「白色的 html 底」變成「深色的 App 內容」。
+     ⚠️ 本機真 Chrome（390x844 模擬 iPhone、逐 rAF 取樣）**量不到**沒蓋滿：
+        每一次取樣 #splash 的 rect 都是 0,0,390,844。所以真正的成因（iOS 的
+        fixed containing block／safe-area／合成層）**沒有被複現，是推論**。
+        這一條的作用是把整類問題**結構性地消掉**：開場播放中 App 根本不畫，
+        蓋不蓋得滿就不再是正確性的前提。
+     ⚠️ 三個一定要一起看的性質（少一個就會變成「App 永遠看不見」）：
+       ① 只在**冷啟動**成立 —— 熱啟動時 boot 在 body 解析前就掛了 data-splash="off"。
+       ② `#splash.out`（收場淡出）一開始就放行，App 才有得跟它交叉淡入
+          （splash.js 是同一行 addClass("out") ＋ startBoot()）。
+       ③ #splash 一從 DOM 移除，這條選擇器就再也匹配不到 ⇒ boot 的 7 秒交棒保險絲
+          與 app.js 的 splashFallback() 都能把畫面救回來。
+     ⚠️ JS 被停用時 <html> 上不會有 data-splash ⇒ 這條會匹配 ⇒ App 會被藏死。
+        所以下面 <noscript> 那塊**必須**同時把它解除（那裡有配套的 !important 覆寫）。
+     ⚠️ 用兄弟選擇器（~）是因為 #splash 是 <body> 的第一個子元素；
+        新增元素請一律加在 #splash **後面**。 */
+  html:not([data-splash="off"]) #splash:not(.out) ~ *{visibility:hidden;}
   #splash{
     position:fixed; inset:0; z-index:200; overflow:hidden;
     background:var(--splash-bg,#0b0d12); color:var(--splash-ink,#f3f5f9);
@@ -97,8 +121,42 @@
     margin-top:58px; padding:0 26px; text-align:center;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
   }
-  .sp-name{font-size:20px; font-weight:700; letter-spacing:-.01em; line-height:1.3;}
+  /* ⭐⭐ v1.6.1：這一塊畫的是**動畫的起始狀態**，不是完成態。
+     ------------------------------------------------------------
+     三支樣式表是非阻塞的 ⇒ 時序一定是
+       第一次繪製（這一塊畫的）→ 幾十毫秒～數百毫秒 → css/splash.css 被套用 → 動畫從頭跑。
+     這一塊以前畫「完成態」（符號實心、名字看得見），所以 splash.css 一到就會跳回起始狀態：
+     Benson 的螢幕錄影逐格（59.94fps）拍到的就是這個 ——
+       畫格 84–88 金色「雷」實心、名字已經看得到（淺色字壓在淺灰底上像鬼影）
+       畫格 89    「雷」突然變半透明、名字整個消失          ← splash.css 在這一格套上
+       畫格 91→   「雷」慢慢變回實心、名字之後才正常淡入
+     ⇒ 修法是**讓第一幀等於起始狀態**：名字 opacity:0、白起時符號也 opacity:0。
+       splash.css 一套上來就是「接著演」，沒有任何東西需要跳。
+       （對應的另一半在 css/splash.css：那幾條進場動畫的 fill-mode 改成 both，
+         起點交給這裡的靜態值、終點交給動畫自己撐。）
+
+     ⚠️⚠️ 這裡放棄了一個舊的好處，PM 2026-08-27 拍板：
+       舊版畫完成態是為了「三支 CSS 全 404 時仍然看得到一個像樣的開場」。
+       **那個好處放棄了** —— CSS 404 是罕見故障，這個跳動是**每一次開 App 都會發生**。
+       用「每次都醜」換「罕見情況下比較好看」不划算。
+       CSS 全 404 時現在只剩：第一幀的底色（#ebebeb）＋ 符號方塊（白起時它也是隱形的）
+       ＋ splash-boot.js 的 7 秒保險絲把開場收掉、App 正常可用。t14 §75d 釘住這個新期望值。
+
+     ⚠️ --lift／--scale-in 是 css/motion.css 的 token，刻意**不寫後備字面值**：
+       motion.css 也沒到位時 var() 代換失敗 ⇒ 整條宣告無效 ⇒ transform 退回 none，
+       而 opacity 仍然是 0（看不見），所以視覺上沒有差別。
+       寫死後備值才會變成「同一個數字活在兩個地方」，改 token 時必分岔。 */
+  .sp-name{
+    font-size:20px; font-weight:700; letter-spacing:-.01em; line-height:1.3;
+    /* ＝ css/splash.css @keyframes sp-up 的 from（兩種變體的名字都從這裡起跑） */
+    opacity:0; transform:translateY(var(--lift));
+  }
   .sp-name::before{content:var(--splash-name,"好雷嗎?");}
+  /* 白起：符號也是浮出來的 ⇒ 第一幀還沒出現。
+     （印記那一版的符號第一幀本來就是實心的——s-breathe 的 from 就是 scale(1)／不透明，
+       所以**不可以**把這條寫成無條件的，寫了就會把預設變體的第一幀弄成空的。）
+     ＝ css/splash.css @keyframes sp-emerge 的 from。 */
+  html[data-splash-intro="light"] .sp-glyph{opacity:0; transform:scale(var(--scale-in));}
   .sp-tag{display:none;}
 </style>
 <script>
@@ -558,8 +616,11 @@
   <link rel="stylesheet" href="./css/motion.css">
   <link rel="stylesheet" href="./css/splash.css">
   <!-- JS 停用時沒有人會把開場收掉（收屍在 js/splash.js 裡），
-       全螢幕的 #splash 會永遠卡在畫面上＝App 打不開。直接不要畫它。 -->
-  <style>#splash{display:none !important;}</style>
+       全螢幕的 #splash 會永遠卡在畫面上＝App 打不開。直接不要畫它。
+       ⚠️ 第二條是配套：關鍵路徑塊的「開場播放中不畫 App」靠的是
+          html[data-splash="off"]，而那個屬性只有 JS 掛得上去。
+          JS 停用時它不存在 ⇒ 那條會匹配 ⇒ App 會被藏死。這裡把它解除。 -->
+  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;}</style>
 </noscript>
 <style>
   /* ⭐ 開場外觀的落地值就這一塊（其餘一律不用動 css/splash.css）。

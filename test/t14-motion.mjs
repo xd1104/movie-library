@@ -39,6 +39,21 @@ const BOOTJS_C = noComment(BOOTJS);
 const APPJS_C = noComment(APPJS);
 const NOWS = s => s.replace(/\s+/g, "");
 
+/* 「某條規則裡某個屬性的值」（§75c／§75d 共用）。
+   ⚠️ 只認**這一條**選擇器（前面是檔頭、`}` 或 `;`），不會撈到「祖先底下的同名規則」——
+      那個坑 2026-08-27 在 #splash 上真的踩過（尺壞了但訊息長得像實作壞了）。 */
+const ruleBody_ = (css, sel) => {
+  const re = new RegExp("(?:^|[};])\\s*" + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\{([\\s\\S]*?)\\}");
+  const m = re.exec(css);
+  return m ? m[1] : null;
+};
+const declOf_ = (css, sel, prop) => {
+  const b = ruleBody_(css, sel);
+  if (b === null) return null;
+  const m = new RegExp("(?:^|[;{])\\s*" + prop + "\\s*:([^;}]*)").exec(b);
+  return m ? NOWS(m[1]) : null;
+};
+
 /* ⭐ v1.5.0：splash-boot 是 inline 在 index.html 的柵欄裡（不是 <script src>）。
    抽取器刻意**一個正則都不用**（全部 indexOf/slice）：它是「守衛的守衛」，愈笨愈好。 */
 const BOOT_BEGIN = "<!-- SPLASH-BOOT-INLINE:BEGIN";
@@ -1023,8 +1038,9 @@ section("75b. 白起：第一幀是 #ebebeb，而且**只靠 index.html 自己**
      /\.sp-ring\{animation:none;\}/.test(NOWS(SC)),
     "★ 光環是用 animation:none 明確關掉的（§5 的 .sp-ring 是無條件帶動畫的，"
     + "靠「沒寫規則」關不掉，會在亮底上散出一圈沒人要的金環）");
-  ok(/html\[data-splash-intro="light"\]#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)backwardsvar\(--sp-sink\)/.test(NOWS(SC)),
-    "★ 名字的 delay ＝ --sp-sink（等底色沉完才出現：淺色字壓在亮底上讀不到）");
+  ok(/html\[data-splash-intro="light"\]#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)bothvar\(--sp-sink\)/.test(NOWS(SC)),
+    "★ 名字的 delay ＝ --sp-sink（等底色沉完才出現：淺色字壓在亮底上讀不到）"
+    + "；fill-mode 是 both 不是 backwards —— 理由見 §75c");
 
   /* ⑤b 減少動態：白起整個關掉、退回深色第一幀。
      ⭐ 這不是「順便處理 reduce」，是變體定義決定的：白起的價值全部在那段漸變，
@@ -1055,6 +1071,253 @@ section("75b. 白起：第一幀是 #ebebeb，而且**只靠 index.html 自己**
       .test('#splash{background:var(--sp-start,#ebebeb);}'),
     "負控：沒有 data-splash-intro 前綴的 #splash 規則不算白起覆寫（那會把所有情境都變白）");
   ok(contrast("#0b0d12", "#0b0d12") < 1.01, "負控：同一個顏色的對比必須是 1（證明 ③ 那把尺不是恆大於 8）");
+}
+
+/* ================================================================
+   §75c ⭐⭐ 第一次繪製的那一幀 ＝ 動畫的**起始狀態**（v1.6.1，2026-08-27）
+   ----------------------------------------------------------------
+   Benson 說開場「有點小奇怪」。螢幕錄影逐格（59.94fps）拆出來是：
+
+     畫格 84–88  灰白底、金色「雷」**實心**、而且下面已經看得到「好雷嗎?」
+                 （淺色字壓在淺灰底上，像鬼影）
+     畫格 89     「雷」**突然變半透明、名字整個消失**   ← css/splash.css 在這一格被套用
+     畫格 90     同上
+     畫格 91→    「雷」慢慢變回實心、名字之後才正常淡入
+
+   ⇒ 實心 →（跳）淡掉 → 再淡回來；名字則是出現 → 消失 → 再出現。
+
+   根因（第 34 條的「已知限制 1」自己預告過的那個窗口）：
+   三支樣式表是**非阻塞**的（media="print" onload），所以順序永遠是
+     第一次繪製（關鍵路徑 inline CSS 畫的）→ 幾十毫秒～數百毫秒 → splash.css 套用 → 動畫從頭跑。
+   關鍵路徑塊以前畫的是**完成態**（符號實心、名字可見），而動畫的起始狀態是「還沒出現」
+   ⇒ 中間必然跳一次。**深色版時代也在**（舊版名字早就是 1 → 0 → 1），
+   只是深底＋深色字看不出來；白起把底色變亮，整件事就現形了。
+
+   ⇒ 硬界線：**關鍵路徑塊對每一個「會被動畫接手」的屬性，靜態值必須等於該動畫 from 的值。**
+     連帶：靜態值一旦變成起始狀態，`backwards` 就撐不住終點（演完會退回起始狀態
+     ＝ 名字自己不見）⇒ 那幾條的 fill-mode 必須是 `both`／`forwards`。
+     §67 的「進場一律 backwards」是為了保住 `:active`，而 #splash 全程不可互動
+     （splash.css §2 有 user-select:none、裡面一顆按鈕都沒有）⇒ 那個代價在這裡是 0。
+
+   ⚠️⚠️ 這一節**放棄了一個舊的好處**（PM 2026-08-27 拍板，不是偷偷放寬）：
+     舊版關鍵路徑塊畫完成態，是為了「三支 CSS 全 404 時仍然看得到一個像樣的開場」。
+     那個好處放棄了 —— **CSS 404 是罕見故障，這個跳動是每一次開 App 都會發生。**
+     用「每次都醜」去換「罕見情況下比較好看」不划算。新的 CSS-404 期望值在 §75d。
+
+   ⚠️ 為什麼不走另一條路（把 intro 動畫也 inline 進關鍵路徑塊）：
+     動畫的時長全部是 css/motion.css 的 token（--dur-*／--sp-sink）。motion.css 也是非阻塞的
+     ⇒ 第一次繪製時 var() 代換失敗 ⇒ 整條 animation 宣告無效 ⇒ 那一幕根本沒有動畫，
+     等 motion.css 到了才從頭跑 ——**相依對象只是從 splash.css 換成 motion.css，窗口沒有消失**。
+     要真的消滅它就得把時長寫死一份在 index.html，那就是「同一個數字活在兩個地方」。
+   ================================================================ */
+section("75c. 第一次繪製那一幀 ＝ 動畫的起始狀態（符號與名字都不可以跳）");
+{
+  const CRIT = noComment(STYLE_BLOCKS[0]);
+  const SC = noComment(SPLASHCSS);
+
+  /* ---- 四把小尺（都要有負控組，證明它們不是恆真／恆假）---- */
+  /* 抽一條規則的內容：只認**這一條選擇器**（前面是檔頭、} 或 ;），不會撈到祖先底下的同名規則 */
+  const ruleBody = (css, sel) => {
+    const re = new RegExp("(?:^|[};])\\s*" + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\{([\\s\\S]*?)\\}");
+    const m = re.exec(css);
+    return m ? m[1] : null;
+  };
+  /* @keyframes 的內容（大括號要配對，裡面有巢狀的格） */
+  const kfBody = (css, name) => {
+    const m = new RegExp("@keyframes\\s+" + name + "\\s*\\{").exec(css);
+    if (!m) return null;
+    let i = m.index + m[0].length, depth = 1;
+    for (; i < css.length && depth > 0; i++) {
+      if (css[i] === "{") depth++;
+      else if (css[i] === "}") { depth--; if (!depth) break; }
+    }
+    return depth ? null : css.slice(m.index + m[0].length, i);
+  };
+  const kfStop = (kf, names) => {
+    if (kf === null) return null;
+    for (const n of names) {
+      const m = new RegExp("(?:^|[};])\\s*" + n + "\\s*\\{([^}]*)\\}").exec(kf);
+      if (m) return m[1];
+    }
+    return null;
+  };
+  const declOf = (body, prop) => {
+    if (body === null) return null;
+    const m = new RegExp("(?:^|[;{])\\s*" + prop + "\\s*:([^;}]*)").exec(String(body));
+    return m ? NOWS(m[1]) : null;
+  };
+  /* 關鍵路徑塊的「有效靜態值」：只在指定的那幾條選擇器之間做迷你 cascade（高特異性排前面） */
+  const critEff = (css, sels, prop, initial) => {
+    for (const s of sels) {
+      const v = declOf(ruleBody(css, s), prop);
+      if (v !== null) return v;
+    }
+    return initial;
+  };
+  /* scale(1)／translateY(0) 跟 none 是同一個矩陣，1.0 跟 1 是同一個數 —— 不正規化的話
+     這把尺會對著「畫面完全一樣」報錯，那是尺壞了。只認恆等寫法，不要擴充成模糊比對。 */
+  const same = (prop, a, b) => {
+    if (a === null || b === null) return a === b;
+    if (prop === "opacity") return Number(a) === Number(b);
+    const n = v => {
+      const s = NOWS(v).toLowerCase();
+      return ["scale(1)", "scale(1,1)", "scalex(1)", "translatey(0)", "translatey(0px)",
+        "translate(0,0)", "translate(0px,0px)"].includes(s) ? "none" : s;
+    };
+    return n(a) === n(b);
+  };
+
+  ok(kfBody(SC, "sp-up") !== null && kfBody(SC, "sp-emerge") !== null,
+    "★ 尺沒壞：抓得到 @keyframes sp-up 與 sp-emerge");
+  ok(kfBody("@keyframes sp-sink-bg{from{opacity:0;}}", "sp-sink") === null,
+    "負控：kfBody 不可以被 sp-sink-bg 餵飽（`\\b` 在連字號上也成立，這是踩過的坑）");
+  ok(declOf("opacity:0;transform:none;", "opacity") === "0" &&
+     declOf("font-size:20px;", "opacity") === null &&
+     declOf("-webkit-opacity:9;", "opacity") === null,
+    "負控：declOf 讀得到值、沒宣告時回 null、不會被帶前綴的屬性名餵飽");
+  ok(same("transform", "scale(1)", "none") && !same("transform", "scale(.985)", "none") &&
+     same("opacity", "1.0", "1") && !same("opacity", "0", "1"),
+    "負控：值的等價比對認得單位矩陣，但分得出真的縮放與真的透明度");
+
+  /* ---- 對照表：白起變體下，每一個被動畫接手的元素 ---- */
+  const TARGETS = [
+    { what: "符號", anim: "sp-emerge",
+      modSel: 'html[data-splash-intro="light"] #splash .sp-glyph',
+      critSels: ['html[data-splash-intro="light"] .sp-glyph', ".sp-glyph"] },
+    { what: "名字", anim: "sp-up",
+      modSel: 'html[data-splash-intro="light"] #splash .sp-name',
+      critSels: ['html[data-splash-intro="light"] .sp-name', ".sp-name"] }
+  ];
+  ok(TARGETS.length === 2, "★ 尺沒壞：白起有 2 個會被動畫接手的元素（符號、名字）");
+
+  /* 抽成函式才能拿假輸入回頭驗它不是恆綠（見最後的負控組） */
+  const mismatches = (critCss) => {
+    const out = [];
+    for (const t of TARGETS) {
+      const rule = ruleBody(SC, t.modSel);
+      if (rule === null) { out.push("找不到 " + t.modSel); continue; }
+      const anim = (/animation\s*:\s*([^;]+)/.exec(rule) || [, ""])[1];
+      if (anim.indexOf(t.anim) < 0) { out.push(t.what + " 的動畫不是 " + t.anim); continue; }
+      const kf = kfBody(SC, t.anim);
+      const from = kfStop(kf, ["from", "0%"]);
+      const to = kfStop(kf, ["to", "100%"]);
+      if (from === null) { out.push("@keyframes " + t.anim + " 沒有 from"); continue; }
+      for (const prop of ["opacity", "transform"]) {
+        const start = declOf(from, prop);
+        if (start === null) continue;               /* 這一拍沒動這個屬性 ⇒ 沒有約束 */
+        const got = critEff(critCss, t.critSels, prop, prop === "opacity" ? "1" : "none");
+        if (!same(prop, got, start)) {
+          out.push(t.what + "的 " + prop + "：第一幀是 " + got + "，動畫 from 是 " + start);
+        }
+        const end = declOf(to, prop);
+        if (end !== null && !same(prop, end, got) && !/\b(both|forwards)\b/.test(anim)) {
+          out.push(t.what + "的 " + prop + " fill-mode 撐不住終點（演完會退回 " + got + "）");
+        }
+      }
+    }
+    return out;
+  };
+
+  const bad = mismatches(CRIT);
+  ok(bad.length === 0,
+    "★★ 第一幀與動畫起始狀態逐條相同（符號與名字的 opacity／transform，含 fill-mode 撐得住終點）",
+    bad.join(" ｜ "));
+
+  /* 逐條把實際值印出來，不要只給「過了」 */
+  for (const t of TARGETS) {
+    const from = kfStop(kfBody(SC, t.anim), ["from", "0%"]);
+    const gotO = critEff(CRIT, t.critSels, "opacity", "1");
+    ok(same("opacity", gotO, declOf(from, "opacity")),
+      "★ " + t.what + "：關鍵路徑 opacity=" + gotO + " ＝ @keyframes " + t.anim
+      + " from 的 opacity=" + declOf(from, "opacity"));
+  }
+
+  /* ---- 負控組：拿「v1.6.0 那一版的關鍵路徑塊」（完成態）餵同一把尺，必須抓得到 ----
+     這是本輪的核心：證明這條斷言真的抓得到 Benson 看到的那個跳動。 */
+  {
+    const OLD = ".sp-name{font-size:20px; font-weight:700;}\n.sp-glyph{width:76px; height:76px;}";
+    const caught = mismatches(OLD);
+    ok(caught.length >= 2,
+      "負控：拿 v1.6.0 的完成態關鍵路徑塊來驗，必須抓到符號與名字兩邊都會跳（抓到 "
+      + caught.length + " 條：" + caught.join(" ｜ ") + "）");
+    ok(caught.some(s => s.indexOf("名字") === 0) && caught.some(s => s.indexOf("符號") === 0),
+      "負控：而且兩個元素都要被點名，不是只抓到其中一個");
+  }
+
+  /* ---- #splash::before（白起的漸深層）刻意不進關鍵路徑 ----
+     關鍵路徑塊沒有這條規則 ⇒ 那個盒子根本不存在 ＝ 畫不出東西，
+     跟模組裡的靜態 opacity:0 等價。兩邊有任何一邊變了都要紅。 */
+  ok(!/#splash::before/.test(NOWS(CRIT)),
+    "★ 關鍵路徑塊沒有 #splash::before（漸深那一層放進來就是同一條動畫活在兩個地方）");
+  ok(declOf(ruleBody(SC, 'html[data-splash-intro="light"] #splash::before'), "opacity") === "0",
+    "★ 而模組裡 ::before 的靜態 opacity 是 0 ⇒ 「沒有這個盒子」與「有但透明」畫出來一樣");
+
+  /* ---- fill-mode：兩條進場都要 both（不是 backwards）---- */
+  const N = NOWS(SC);
+  ok(/#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)both/.test(N),
+    "★ 印記變體的名字也是 both（那一版的名字本來就會 1 → 0 → 1，同一個病）");
+  ok(/\.sp-glyph\{animation:sp-emergecalc\(var\(--dur-3\)\+var\(--dur-1\)\)var\(--ease\)both;\}/.test(N),
+    "★ 白起的符號是 both");
+  ok(!/animation:sp-up[^;]*backwards/.test(N) && !/animation:sp-emerge[^;]*backwards/.test(N),
+    "★ 而且沒有任何一條 sp-up／sp-emerge 還留著 backwards（留著就是演完會自己不見）");
+
+  /* ---- --lift／--scale-in 不可以在關鍵路徑塊寫死後備值 ----
+     寫死＝同一個數字活在兩個地方；不寫的話 var() 代換失敗會退回 none，
+     而那時 opacity 已經是 0（看不見），視覺上沒有差別。 */
+  ok(/transform:translateY\(var\(--lift\)\)/.test(NOWS(CRIT)) &&
+     !/var\(--lift,/.test(NOWS(CRIT)),
+    "★ 名字的起始位移走 var(--lift)、而且**沒有**後備字面值");
+  ok(/transform:scale\(var\(--scale-in\)\)/.test(NOWS(CRIT)) &&
+     !/var\(--scale-in,/.test(NOWS(CRIT)),
+    "★ 符號的起始縮放走 var(--scale-in)、而且**沒有**後備字面值");
+}
+
+/* ================================================================
+   §75d ⭐ 「三支 CSS 全 404」的**新**期望值（v1.6.1 調整過，不是放寬）
+   ----------------------------------------------------------------
+   舊期望值：CSS 全 404 時仍然看得到一個像樣的開場（符號實心、名字可見）。
+   新期望值：CSS 全 404 時只剩 **①第一幀的底色是我們決定的 #ebebeb
+             ②保險絲仍然收得掉開場 ③App 仍然完整可用**。
+
+   為什麼要換（PM 2026-08-27 拍板，理由寫在這裡免得下一個人把它「修」回去）：
+     舊的好處要用「關鍵路徑塊畫完成態」換，而完成態 ≠ 動畫起始狀態
+     ⇒ **每一次開 App 都會跳一次**（§75c 那個窗口）。
+     CSS 404 是罕見故障（離線第一次進站、部署漏檔、SW 殼快取沒建完），
+     用「每次都醜」去換「罕見情況下比較好看」不划算。
+
+   ⚠️ 這一節刻意**不是**把舊斷言刪掉，而是換成新的期望值 ——
+      「CSS 全 404」這條降級路徑仍然有測試，只是量的東西變了。
+   ================================================================ */
+section("75d. CSS 全 404 的新期望值：底色是我們決定的、保險絲收得掉、App 可用");
+{
+  const CRIT = noComment(STYLE_BLOCKS[0]);
+
+  /* ① 第一幀的底色仍然完全由 index.html 自己決定（不依賴那三支） */
+  ok(/html\[data-splash-intro="light"\]:not\(\[data-splash="off"\]\)[^{}]*\{[^}]*background:var\(--sp-start,#ebebeb\)/
+      .test(NOWS(CRIT)),
+    "★ CSS 全 404 時 <html> 仍然是 #ebebeb（後備字面值就在關鍵路徑塊裡）");
+  ok(/html\[data-splash-intro="light"\]#splash[^{}]*\{[^}]*background:var\(--sp-start,#ebebeb\)/.test(NOWS(CRIT)),
+    "★ #splash 也是（不靠繼承）");
+
+  /* ② 新期望值：名字與符號**不會**出現。這是刻意的取捨，寫成正面斷言擋人「順手修回去」 */
+  ok(declOf_(CRIT, ".sp-name", "opacity") === "0",
+    "★ 名字在 CSS 全 404 時是隱形的 —— 刻意的：第一幀必須等於動畫起始狀態（§75c）");
+  ok(declOf_(CRIT, 'html[data-splash-intro="light"] .sp-glyph', "opacity") === "0",
+    "★ 白起的符號也是。放棄的舊好處是「404 時仍有像樣的開場」，換到的是「每次開 App 都不跳」");
+  /* 但符號方塊的**長相**（尺寸、圓角、底色、字色）仍然要留在關鍵路徑塊裡：
+     它只是起始 opacity 是 0，不是整條規則被刪掉。 */
+  ok(/\.sp-glyph\{[^}]*width:76px/.test(NOWS(CRIT)) && /\.sp-glyph\{[^}]*border-radius:22px/.test(NOWS(CRIT)),
+    "★ 符號方塊的尺寸／圓角規則仍然在（只是起始透明度是 0，不是把規則刪了）");
+
+  /* ③ 保險絲仍然收得掉、App 仍然可用 —— 真的跑一次（CSS 全 404 ＝ 三支都回報 onerror） */
+  const { w, d } = await boot({ store: ST, beforeEval: withSplash() });
+  const links = [...d.querySelectorAll("link[data-splash-css]")];
+  ok(links.length === 3, "★ 尺沒壞：找得到 3 支樣式表（實際 " + links.length + "）");
+  links.forEach(l => w.__splashCss(l));       /* 模擬三支全部 404（onerror） */
+  ok(!d.documentElement.hasAttribute("data-cssgate"), "★ 閘門開了（404 不可以變成永遠看不見）");
+  await tick(w, 3000);
+  ok(!d.getElementById("splash"), "★ 開場被收掉了（CSS 全 404 也一樣收得掉）");
+  ok(d.querySelectorAll(".row[data-open]").length === 6, "★ App 完整可用（片單出得來）");
 }
 
 /* ================================================================
@@ -1151,9 +1414,19 @@ section("78a. 非阻塞 CSS 的形態（全掃描，不是列白名單）");
   /* ⚠️ 掃之前要先把 HTML 註解塗掉：註解裡寫著「<noscript> 那三行是給…」，
      不塗的話「哪些 link 在 noscript 裡」會整組算錯（實際踩到過，
      守衛會回報「一支樣式表都沒掃到」）。塗成等長空白，index 才不會歪。 */
-  const IDX_NC = IDX.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, " "));
+  /* ⚠️ 同一個病的第二種形狀（2026-08-27 v1.6.1 踩到）：**CSS 註解**裡也會寫到
+     `<noscript>`（「所以下面 <noscript> 那塊必須…」），而只塗 HTML 註解的話它還在
+     ⇒ noscript 的範圍從那個字開始算 ⇒ 「掃到 0 支正式的樣式表、6 支在 noscript 裡」。
+     訊息長得像實作壞了，其實是尺壞了。<style> 裡的 CSS 註解一樣要塗成等長空白。 */
+  const blankIn = (s, blockRe, cmtRe) => s.replace(blockRe, blk =>
+    blk.replace(cmtRe, m => m.replace(/[^\n]/g, " ")));
+  const IDX_NC = blankIn(
+    IDX.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, " ")),
+    /<style[^>]*>[\s\S]*?<\/style>/g, /\/\*[\s\S]*?\*\//g);
   ok(IDX_NC.length === IDX.length, "★ 尺沒壞：塗掉註解沒有改變長度（否則位置比較全錯）");
   ok(IDX_NC !== IDX, "★ 尺沒壞：真的塗掉了至少一段註解");
+  ok(IDX_NC.indexOf("<noscript") !== IDX.indexOf("<noscript"),
+    "★ 尺沒壞：塗白之後 <noscript> 的第一個出現位置往後移了（證明註解裡那些假標籤真的被塗掉）");
 
   const nsRanges = [...IDX_NC.matchAll(/<noscript[^>]*>[\s\S]*?<\/noscript>/g)]
     .map(m => [m.index, m.index + m[0].length]);
@@ -1204,10 +1477,81 @@ section("78b. 閘門規則要寫在關鍵路徑塊裡（外部 CSS 全掛也要�
   ok(/html\[data-cssgate\]\{background:var\(--splash-bg,/.test(C) ||
      /html\[data-cssgate\][^{,]*[,{][^}]*background:var\(--splash-bg,/.test(C),
     "★ 閘門期間 <html> 的底色是 --splash-bg（深色）—— 這一段本來就是賽跑要贏的那一段，不可以自己補一塊白");
+  /* ⭐⭐ v1.6.1：開場**播放中**也要把 App 內容壓住（不只閘門那一段）。
+     ----------------------------------------------------------------
+     Benson 的螢幕錄影在畫格 89–90（＝ splash.css 被套用的那一刻）拍到
+     **畫面下緣露出一條深色的 App 內容**（看得到電影卡片）。
+     時間點對得起來的原因就在上面那條閘門：閘門正好是在那一刻開的
+     （三支樣式表回報完成 → boot 開閘）⇒ 任何沒被 #splash 蓋到的像素，
+     會在**那一格**從「白色的 html 底」變成「深色的 App 內容」。
+     ⚠️ 本機真 Chrome（390x844、逐 rAF 取樣）**量不到 #splash 沒蓋滿**
+        （每一次取樣 rect 都是 0,0,390,844）⇒ 真正的成因（iOS 的 safe-area／
+        fixed containing block／合成層）沒有被複現，是推論。
+     ⇒ 所以修法選「開場播放中根本不畫 App」，把「#splash 有沒有蓋滿每一個
+       實體像素」從正確性的前提裡拿掉 —— 整類問題結構性消失。 */
+  const PLAY = /html:not\(\[data-splash="off"\]\)#splash:not\(\.out\)~\*\{visibility:hidden;?\}/;
+  ok(PLAY.test(C),
+    "★★ 有「開場播放中不畫 App」那一條（html:not([data-splash=off]) #splash:not(.out) ~ *）");
+  ok(C.indexOf('#splash:not(.out)~*') >= 0,
+    "★ 是**全掃描**（~ * 掃到 #splash 之後的每一個兄弟），不是列白名單");
+  /* 三個性質各驗一次：少一個就會變成「App 永遠看不見」 */
+  ok(PLAY.source.indexOf('data-splash="off"') >= 0 && PLAY.test(C),
+    "★ ①帶 :not([data-splash=\"off\"]) ⇒ 熱啟動（boot 在 body 解析前就掛 off）不受影響");
+  ok(PLAY.source.indexOf("\\.out") >= 0 && PLAY.test(C),
+    "★ ②帶 :not(.out) ⇒ 收場淡出一開始就放行，App 才有得跟它交叉淡入");
+  {
+    const nsBlock = (/<noscript[^>]*>([\s\S]*?)<\/noscript>/.exec(IDX) || [, ""])[1];
+    ok(/#splash~\*\{visibility:visible!important;?\}/.test(NOWS(nsBlock)),
+      "★ ③<noscript> 裡把它解除 —— JS 停用時 <html> 上沒有 data-splash，"
+      + "不解除的話這條會匹配，**整個 App 被藏死**");
+  }
   /* 負控組 */
   const FAKE = "#splash{position:fixed;}html{background:var(--splash-bg,#000);}";
   ok(!/html\[data-cssgate\][^{]*\{[^}]*visibility:hidden/.test(NOWS(FAKE)),
     "負控：沒有閘門規則的 CSS 必須判成不合格");
+  ok(!PLAY.test(NOWS('html #splash ~ *{visibility:hidden;}')),
+    "負控：少了 :not([data-splash=\"off\"]) 與 :not(.out) 的版本不算數（那會把熱啟動與收場一起藏掉）");
+  ok(PLAY.test(NOWS('html:not([data-splash="off"]) #splash:not(.out) ~ *{visibility:hidden;}')),
+    "負控：正確寫法必須算數（證明這把尺不是恆 false ＝ 恆紅）");
+  ok(!/#splash~\*\{visibility:visible!important;?\}/.test(NOWS("<style>#splash{display:none !important;}</style>")),
+    "負控：只有 display:none 不算解除（display:none 擋不住兄弟選擇器）");
+}
+
+section("78b2. 開場播放中的遮罩：三條逃生路真的跑一次（不是只讀 CSS 字串）");
+{
+  /* ① 熱啟動：boot 在 body 解析前就掛 data-splash="off" ⇒ 遮罩從一開始就不成立 */
+  {
+    const { d } = await boot({
+      store: ST,
+      beforeEval: withSplash(win => { win.sessionStorage.setItem("splash-seen:movie-library:1", "1"); })
+    });
+    ok(d.documentElement.getAttribute("data-splash") === "off",
+      "★ 熱啟動：data-splash=off 在第一幀就掛上 ⇒ 遮罩不匹配（App 直接看得到）");
+  }
+  /* ② 冷啟動走完整流程：收場時 #splash 會先拿到 .out（放行），最後整個離開 DOM */
+  {
+    const { w, d } = await boot({ store: ST, beforeEval: withSplash() });
+    ok(!!d.getElementById("splash"), "（前提）冷啟動，開場在畫面上");
+    ok(d.documentElement.getAttribute("data-splash") !== "off", "（前提）遮罩此時是成立的");
+    await tick(w, 1400);
+    const sp = d.getElementById("splash");
+    ok(!sp || sp.classList.contains("out") ,
+      "★ 最短顯示過後：#splash 帶著 .out（遮罩放行、App 與收場交叉淡入）或已經離開 DOM");
+    await tick(w, 1600);
+    ok(!d.getElementById("splash"), "★ 最後 #splash 從 DOM 移除 ⇒ 兄弟選擇器再也匹配不到");
+    ok(d.documentElement.getAttribute("data-splash") === "off", "★ 而且 data-splash=off 也補上了（雙保險）");
+  }
+  /* ③ splash.js 沒載到：boot 的 7 秒交棒保險絲把 #splash 拿掉 ⇒ 遮罩自動失效 */
+  {
+    const { w, d } = await boot({
+      store: ST,
+      beforeEval: withBootOnly(win => { win.Splash = { hold() { }, ready() { } }; })
+    });
+    ok(!!d.getElementById("splash"), "（前提）沒有人接手，開場還在");
+    await tick(w, 7400);
+    ok(!d.getElementById("splash"),
+      "★ 交棒保險絲把 #splash 移除 ⇒ 遮罩失效、App 看得見（遮罩不會把 App 藏死）");
+  }
 }
 
 section("78c. 失敗路徑①：CSS 遲到／onload 永遠不觸發 ⇒ 2 秒保險絲一定開閘");

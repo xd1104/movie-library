@@ -294,7 +294,7 @@ const M = [
   ["X30 拿掉一支 <noscript> fallback（JS 停用時整頁沒樣式）", "index.html",
     `  <link rel="stylesheet" href="./css/app.css">\n`, ``],
   ["X31 <noscript> 不再關掉開場（JS 停用時全螢幕開場永遠卡住）", "index.html",
-    `  <style>#splash{display:none !important;}</style>\n`, ``],
+    `  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;}</style>\n`, ``],
   ["X32 拿掉交棒保險絲（splash.js 沒載到就沒有人收開場）", "js/splash-boot.js",
     `  W.setTimeout(function () {
     if (W.__splashTakeover) { return; }   /* splash.js 有接手，交給它 */
@@ -326,8 +326,8 @@ const M = [
   ["X42 有人把 --sp-start 改成 manifest 的深色「讓顏色統一」（等於把白起整個關掉）", "css/splash.css",
     `  --sp-start:#ebebeb;`, `  --sp-start:#0b0d12;`],
   ["X43 名字不等漸深結束就出現（淺字壓在亮底上讀不到）", "css/splash.css",
-    `  animation:sp-up var(--dur-3) var(--ease) backwards var(--sp-sink);`,
-    `  animation:sp-up var(--dur-3) var(--ease) backwards;`],
+    `  animation:sp-up var(--dur-3) var(--ease) both var(--sp-sink);`,
+    `  animation:sp-up var(--dur-3) var(--ease) both;`],
   ["X44 漸深塞回 #splash 自己的 animation（跟收場的淡出搶同一條時間線）", "css/splash.css",
     `html[data-splash-intro="light"] #splash::before{`,
     `html[data-splash-intro="light"] #splash.__never__::before{`],
@@ -351,6 +351,37 @@ const M = [
     html[data-splash-intro="light"]:not([data-splash="off"]),
     html[data-splash-intro="light"] #splash{background:var(--splash-bg,#0b0d12);}
   }\n`, ``],
+  /* ⭐⭐ v1.6.1「第一幀 ＝ 動畫起始狀態」（§75c／§75d）。
+     X50／X51／X54／X55 落在 index.html（沒有 SHA 鎖鏈），所以它們證明的是 §75c 本身承重；
+     X52／X53 動的是 css/splash.css ⇒ §74（跟 app-template 正本比 SHA）一定會跟著紅，
+     那是這兩個檔案的結構性限制（X19／X33／X41～X49 從一開始就有），不是這一輪才有的。 */
+  ["X50 關鍵路徑的名字回到「完成態」（Benson 看到的那個跳動：出現 → 消失 → 再出現）", "index.html",
+    `    opacity:0; transform:translateY(var(--lift));\n  }\n  .sp-name::before`,
+    `  }\n  .sp-name::before`],
+  ["X51 關鍵路徑的白起符號回到「完成態」（實心 →（跳）淡掉 → 再淡回來）", "index.html",
+    `  html[data-splash-intro="light"] .sp-glyph{opacity:0; transform:scale(var(--scale-in));}\n`, ``],
+  ["X52 名字的 fill-mode 改回 backwards（起點對了，但演完會自己不見）", "css/splash.css",
+    `  animation:sp-up var(--dur-3) var(--ease) both\n            calc(var(--sp-hold) + var(--dur-2));`,
+    `  animation:sp-up var(--dur-3) var(--ease) backwards\n            calc(var(--sp-hold) + var(--dur-2));`],
+  ["X53 白起符號的 fill-mode 改回 backwards（浮出來之後又消失）", "css/splash.css",
+    `  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) both;`,
+    `  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) backwards;`],
+  ["X54 關鍵路徑替 --lift 補了後備字面值（同一個數字活在兩個地方，改 token 必分岔）", "index.html",
+    `transform:translateY(var(--lift));`, `transform:translateY(var(--lift,10px));`],
+  ["X55 白起符號的起始透明度變成半吊子（0.5 ≠ 動畫的 from，照樣會跳）", "index.html",
+    `html[data-splash-intro="light"] .sp-glyph{opacity:0;`,
+    `html[data-splash-intro="light"] .sp-glyph{opacity:.5;`],
+  /* ⭐ v1.6.1「開場播放中不畫 App」（§78b／§78b2）。X58／X59 是「守衛的守衛」：
+     少一個 :not() 的版本會讓熱啟動或收場整段被藏起來，而純功能測試抓不到（App 還是能用）。 */
+  ["X56 拿掉「開場播放中不畫 App」的遮罩（畫面沒被 #splash 蓋到的地方會露出 App 內容）", "index.html",
+    `  html:not([data-splash="off"]) #splash:not(.out) ~ *{visibility:hidden;}\n`, ``],
+  ["X57 <noscript> 沒有把遮罩解除（JS 停用時整個 App 被藏死）", "index.html",
+    `  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;}</style>`,
+    `  <style>#splash{display:none !important;}</style>`],
+  ["X58 遮罩漏了 :not([data-splash=\"off\"])（熱啟動也會被藏起來）", "index.html",
+    `html:not([data-splash="off"]) #splash:not(.out) ~ *`, `html #splash:not(.out) ~ *`],
+  ["X59 遮罩漏了 :not(.out)（收場淡出時 App 還是黑的，交叉淡入變成硬切）", "index.html",
+    `html:not([data-splash="off"]) #splash:not(.out) ~ *`, `html:not([data-splash="off"]) #splash ~ *`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

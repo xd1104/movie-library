@@ -53,3 +53,23 @@ node scripts/probe/shot.mjs http://127.0.0.1:8083/index.html 450
    → 單一 Chrome ＋ 交錯 ＋ 每輪隨機打散。**看 p25 不要只看中位**，中位很容易被機器忙碌度帶走。
 3. **機器忙的時候數字整組會漂**（跑五個 server 的時候中位從 300ms 漂到 1100ms）。
    要下結論的那一輪，先把其他東西關掉，而且**永遠是同一輪之內互相比**，不要跨輪比。
+
+## `first-frame.mjs`（2026-08-27 v1.6.1 新增）
+
+驗**「第一次繪製那一幀 ＝ 動畫的起始狀態」**——三支樣式表是非阻塞的，所以
+第一次繪製是 `index.html` 的關鍵路徑 inline CSS 畫的，`css/splash.css` 幾十毫秒之後才套用、
+動畫從頭跑。兩者只要不一致，畫面就會跳一次（Benson 的錄影畫格 89 就是這個）。
+
+```bash
+node scripts/probe/first-frame.mjs                 # 正常量測 ＋ 負控組
+node scripts/probe/first-frame.mjs --delay=1200    # 把 CSS 的窗口撐得更開
+```
+
+- 自己起 server（可延遲 CSS、可改寫 index.html），不用另開行程。
+- 逐 rAF 取樣；取樣點用**頁面自己看得到的狀態**判斷（三支 link 的 `media` 都變成 `all`），
+  不是用外部時鐘猜。
+- **自帶負控組**：把關鍵路徑塊換回 v1.6.0 的完成態再量一次，這把尺必須翻紅
+  （實測跳幅 1.000）。容差 0.08 是兩幀的取樣延遲，腳本會斷言負控組的跳幅至少是容差的 10 倍。
+- 順便斷言 `#splash` 在第一次繪製那一幀就蓋滿整個 viewport，
+  而且 `elementFromPoint(中央, innerHeight-1)` 落在 `#splash` 裡。
+- exit 0 過／1 有東西在跳／2 尺壞了（沒取到樣、找不到 Chrome）。
