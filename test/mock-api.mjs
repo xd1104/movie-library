@@ -89,9 +89,14 @@ export const PTT_MOVIES = {
     pp("負雷", "[負雷] 侏羅紀 看不下去", 33, "8/09")
   ]}
 };
+/* ⚠️ 「一小時前」不可以寫死成 Date.now() - 3600e3：
+   在 00:00～01:00 之間跑測試時它會落到**昨天**，t12 的「更新於 今天 HH:MM」那條斷言就會紅
+   —— 而那是**尺壞了不是實作壞了**（2026-08-28 00:02 真的踩到，訊息長得像 UI 壞了）。
+   所以夾在「今天 00:00:30」之後：白天完全照舊，只有跨午夜那一小時會自動改用今天的凌晨。 */
+const anHourAgo = () => Math.max(Date.now() - 3600e3, new Date().setHours(0, 0, 30, 0));
 export function pttPayload(over = {}) {
   return {
-    updated: new Date(Date.now() - 3600e3).toISOString().replace(/\.\d+Z$/, "Z"),
+    updated: new Date(anHourAgo()).toISOString().replace(/\.\d+Z$/, "Z"),
     source: "https://www.ptt.cc/bbs/movie/index.html",
     scanned: { pages: 40, posts: 797, tagged: 158, matched: 104, ambiguous: 0, unmatched: 54 },
     movies: PTT_MOVIES,

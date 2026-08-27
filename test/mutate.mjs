@@ -246,10 +246,10 @@ const M = [
     `  html[data-cssgate]{background:var(--splash-bg,#0b0d12);}`,
     `  html[data-cssgate]{background:var(--splash-bg,#0c0d12);}`],
   ["X19 開場最短顯示調回 650（動作剛做完就走，沒有那一拍定格）", "js/splash.js",
-    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1230 : 950);`,
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1490 : 950);`,
     `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 650 : 950);`],
   ["X36 白起用回印記的最短顯示（名字還沒演完就被收掉）", "js/splash.js",
-    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1230 : 950);`,
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1490 : 950);`,
     `  var MIN_SHOW = REDUCE ? 300 : 950;`],
   ["X20 關鍵路徑把符號字色寫死（不再跟著 onColor，鑰匙圈換色就分岔）", "index.html",
     `    color:var(--splash-on-accent);`, `    color:#ffffff;`],
@@ -326,8 +326,8 @@ const M = [
   ["X42 有人把 --sp-start 改成 manifest 的深色「讓顏色統一」（等於把白起整個關掉）", "css/splash.css",
     `  --sp-start:#ebebeb;`, `  --sp-start:#0b0d12;`],
   ["X43 名字不等漸深結束就出現（淺字壓在亮底上讀不到）", "css/splash.css",
-    `  animation:sp-up var(--dur-3) var(--ease) both var(--sp-sink);`,
-    `  animation:sp-up var(--dur-3) var(--ease) both;`],
+    `  animation:sp-up var(--dur-3) var(--ease) both calc(var(--sp-lead) + var(--sp-sink));`,
+    `  animation:sp-up var(--dur-3) var(--ease) both var(--sp-lead);`],
   ["X44 漸深塞回 #splash 自己的 animation（跟收場的淡出搶同一條時間線）", "css/splash.css",
     `html[data-splash-intro="light"] #splash::before{`,
     `html[data-splash-intro="light"] #splash.__never__::before{`],
@@ -364,8 +364,8 @@ const M = [
     `  animation:sp-up var(--dur-3) var(--ease) both\n            calc(var(--sp-hold) + var(--dur-2));`,
     `  animation:sp-up var(--dur-3) var(--ease) backwards\n            calc(var(--sp-hold) + var(--dur-2));`],
   ["X53 白起符號的 fill-mode 改回 backwards（浮出來之後又消失）", "css/splash.css",
-    `  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) both;`,
-    `  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) backwards;`],
+    `  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) both var(--sp-lead);`,
+    `  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) backwards var(--sp-lead);`],
   ["X54 關鍵路徑替 --lift 補了後備字面值（同一個數字活在兩個地方，改 token 必分岔）", "index.html",
     `transform:translateY(var(--lift));`, `transform:translateY(var(--lift,10px));`],
   ["X55 白起符號的起始透明度變成半吊子（0.5 ≠ 動畫的 from，照樣會跳）", "index.html",
@@ -382,6 +382,26 @@ const M = [
     `html:not([data-splash="off"]) #splash:not(.out) ~ *`, `html #splash:not(.out) ~ *`],
   ["X59 遮罩漏了 :not(.out)（收場淡出時 App 還是黑的，交叉淡入變成硬切）", "index.html",
     `html:not([data-splash="off"]) #splash:not(.out) ~ *`, `html:not([data-splash="off"]) #splash ~ *`],
+  /* ⭐⭐ v1.6.2「開場不可以在畫面被交到使用者眼前之前就演掉一段」（§75e）。
+     X60～X62 是把 --sp-lead 那一拍從三條「delay 原本是 0」的動畫上拿掉 ＝ 精準退回 v1.6.1 的行為；
+     X63 是「有那一拍但不夠長」（比整段拿掉更難用眼睛看出來，正是安全性程式碼真實的退化方式）；
+     X64 是「CSS 加了那一拍、JS 的 MIN_SHOW 忘了跟上」＝ 名字演不完就被收掉。
+     ⚠️ 這五條動的都是有 SHA 鎖鏈的檔案（css/splash.css／js/splash.js）⇒ §74 一定會跟著紅，
+        那是結構性限制（見上面 X52／X53 的註解），要單獨證明 §75e 承重請用「正本與副本同時改」。 */
+  ["X60 漸深層的那一拍被拿掉（使用者看到的第一幀變成漸深走到四成的灰）", "css/splash.css",
+    `  animation:sp-sink var(--sp-sink) linear var(--sp-lead) forwards;`,
+    `  animation:sp-sink var(--sp-sink) linear forwards;`],
+  ["X61 <html> 底色的那一拍被拿掉（overscroll／收場時露出的底色會跟開場對不上）", "css/splash.css",
+    `  animation:sp-sink-bg var(--sp-sink) linear var(--sp-lead) forwards;`,
+    `  animation:sp-sink-bg var(--sp-sink) linear forwards;`],
+  ["X62 符號的那一拍被拿掉（畫面交出來時「雷」已經浮出八成）", "css/splash.css",
+    `var(--ease) both var(--sp-lead);`, `var(--ease) both;`],
+  ["X63 那一拍有但不夠長（180ms < 盲窗 273ms，台階只是變小沒有消失）", "css/splash.css",
+    `  --sp-lead:calc(var(--sp-hold) + var(--dur-press));`,
+    `  --sp-lead:var(--dur-1);`],
+  ["X64 CSS 加了那一拍、MIN_SHOW 忘了跟上（名字演不完就被收掉）", "js/splash.js",
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1490 : 950);`,
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1150 : 950);`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

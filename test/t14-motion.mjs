@@ -561,13 +561,14 @@ section("71. 開場：冷啟動播、收得掉、收掉之後從 DOM 移除");
   ok(w.document.documentElement.style.getPropertyValue("--splash-glyph") === '"雷"', "★ 符號也是");
   await tick(w, 400);
   ok(!!d.getElementById("splash"), "★ 資料還沒到（400ms）時開場還在，蓋住等待");
-  /* ⭐ 1400ms 這一刀是專門用來釘住「白起的最短顯示是 1230 不是 950」的：
-     950 的話 dismiss 在 950ms 發動、收場 OUT_MS+60=400ms，1350ms 就已經從 DOM remove 掉了。
-     （v1.5.0 這一刀原本在 800ms，用來釘 950 vs 650；白起把整條時間線往後推，
-       刀子不跟著移動的話這條就變成「兩個值都會過」＝ 等於沒在釘。） */
-  await tick(w, 1000);
+  /* ⭐ 1600ms 這一刀是專門用來釘住「白起的最短顯示是 1490 不是 1230／950」的：
+     1230 的話 dismiss 在 1230ms 發動、收場 OUT_MS+60=400ms，1630ms 就已經從 DOM remove 掉了
+     —— 所以刀子要落在 1490 與 1630 之間。
+     （v1.5.0 這一刀原本在 800ms（釘 950 vs 650）、v1.6.0 移到 1400（釘 1230 vs 950）；
+       時間線一往後推，刀子不跟著移動的話這條就變成「兩個值都會過」＝ 等於沒在釘。） */
+  await tick(w, 1200);
   ok(!!d.getElementById("splash"),
-    "★ 1400ms 時開場仍在畫面上（白起的最短顯示 1230ms —— 名字到 1120ms 才演完，還要有一拍定格）");
+    "★ 1600ms 時開場仍在畫面上（白起的最短顯示 1490ms —— 名字到 1460ms 才演完，還要有一拍定格）");
   await tick(w, 900);
   ok(!d.getElementById("splash"), "★ 資料到了就收，而且是從 DOM remove 掉（不是 hidden）");
   ok(d.querySelectorAll(".row[data-open]").length === 6, "★ 收掉之後片單是好的（開場沒有拖慢也沒有擋住）");
@@ -575,28 +576,39 @@ section("71. 開場：冷啟動播、收得掉、收掉之後從 DOM 移除");
   /* 直接讀模組自己回報的常數，不用時間去推——時間會被機器忙碌度影響，這條不會 */
   ok(w.Splash.state().intro === "light",
     "★ 演的是「白起」變體（state().intro，直接讀開關不用猜）：" + JSON.stringify(w.Splash.state().intro));
-  ok(w.Splash.state().minShow === 1230,
-    "★ 最短顯示釘死在 1230ms —— 白起的動作到 1120ms 才結束（漸深 700 ＋ 名字 420），"
-    + "再留 110ms 定格。跟印記那一版的 950 是**同一條規則**（動作做完再留一拍），不是另外喊的數字"
+  ok(w.Splash.state().minShow === 1490,
+    "★ 最短顯示釘死在 1490ms —— 白起的動作到 1460ms 才結束（起跑前那一拍 340 ＋ 漸深 700 ＋ 名字 420），"
+    + "再留 30ms 定格。跟印記那一版的 950（動作 920 ＋ 30）是**同一條規則**，不是另外喊的數字"
     + "，實際 " + w.Splash.state().minShow);
-  ok(w.Splash.state().elapsed >= 1230, "★ 最短顯示 1230ms 有守住（實際 " + w.Splash.state().elapsed + "ms）");
-  /* ⭐ 這個數字不是憑空來的：它必須等於「漸深長度 ＋ 名字動畫長度 ＋ 一拍」。
-     漸深長度從 css/splash.css 的 --sp-sink（= --dur-3 + --dur-2）與 motion.css 的 token 真的算一次，
-     不是把 1230 抄兩遍 —— 抄兩遍的話改了 token 這條照樣綠。 */
+  ok(w.Splash.state().elapsed >= 1490, "★ 最短顯示 1490ms 有守住（實際 " + w.Splash.state().elapsed + "ms）");
+  /* ⭐ 這個數字不是憑空來的：它必須等於「起跑前那一拍 ＋ 漸深長度 ＋ 名字動畫長度 ＋ 一拍定格」。
+     每一段都從 css/splash.css 的 --sp-lead／--sp-sink 與 motion.css 的 token 真的算一次，
+     不是把 1490 抄兩遍 —— 抄兩遍的話改了 token 這條照樣綠。
+     ⭐ v1.6.2 新增 --sp-lead 那一段：理由見 §75e（畫面被交到使用者眼前之前的盲窗約 273ms）。 */
   {
     const tok = n => Number((new RegExp("--dur-" + n + ":\\s*(\\d+)ms").exec(MOTION) || [])[1]);
     const d1 = tok(1), d2 = tok(2), d3 = tok(3);
-    ok(d1 === 180 && d2 === 280 && d3 === 420, "★ 尺沒壞：從 motion.css 讀到 --dur-1/2/3 = " + [d1, d2, d3].join("/"));
+    const dpress = Number((/--dur-press:\s*(\d+)ms/.exec(MOTION) || [])[1]);
+    const hold = Number((/--sp-hold:\s*(\d+)ms/.exec(SPLASHCSS) || [])[1]);
+    ok(d1 === 180 && d2 === 280 && d3 === 420 && dpress === 120,
+      "★ 尺沒壞：從 motion.css 讀到 --dur-1/2/3/press = " + [d1, d2, d3, dpress].join("/"));
+    ok(hold === 220, "★ 尺沒壞：從 splash.css 讀到 --sp-hold = " + hold + "ms");
     ok(/--sp-sink:\s*calc\(var\(--dur-3\)\s*\+\s*var\(--dur-2\)\)/.test(SPLASHCSS),
       "★ --sp-sink 是由 --dur-3 ＋ --dur-2 算出來的（沒有引進新時長）");
+    ok(/--sp-lead:\s*calc\(var\(--sp-hold\)\s*\+\s*var\(--dur-press\)\)/.test(SPLASHCSS),
+      "★ --sp-lead 是由 --sp-hold ＋ --dur-press 算出來的（沒有引進新時長）");
+    const lead = hold + dpress;           /* 340 */
     const sink = d3 + d2;                 /* 700 */
-    const nameEnd = sink + d3;            /* 1120：名字 delay=--sp-sink，長度 --dur-3 */
-    ok(sink === 700 && nameEnd === 1120, "★ 算出來的漸深 " + sink + "ms、動作結束 " + nameEnd + "ms");
+    const nameEnd = lead + sink + d3;     /* 1460：名字 delay = lead + sink，長度 --dur-3 */
+    ok(lead === 340 && sink === 700 && nameEnd === 1460,
+      "★ 算出來的起跑前那一拍 " + lead + "ms、漸深 " + sink + "ms、動作結束 " + nameEnd + "ms");
     ok(w.Splash.state().minShow > nameEnd,
       "★ 最短顯示（" + w.Splash.state().minShow + "）大於動作結束的時間（" + nameEnd
       + "）—— 名字一定演得完，不會被收場切掉");
-    ok(w.Splash.state().minShow - nameEnd === 110,
-      "★ 而且多出來的正好是那一拍定格 110ms（改 --dur-* 而忘了回頭改 MIN_SHOW 的話這條會紅）");
+    ok(w.Splash.state().minShow - nameEnd === 30,
+      "★ 而且多出來的正好是那一拍定格 30ms —— 跟印記那一版（950 − 920）逐字相同。"
+      + "v1.6.2 把它從 110 縮成 30，是為了把 --sp-lead 多出來的時間吐回去一點"
+      + "（改 --dur-*／--sp-lead 而忘了回頭改 MIN_SHOW 的話這條會紅）");
   }
 }
 
@@ -748,11 +760,12 @@ section("73. 鑰匙圈讀外觀：快取優先、背景更新、下次冷啟動�
   }
   const CK = "splash:movie-library";
   /* 讀鑰匙圈是在開場收掉之後才發動的：MIN_SHOW → 收場 OUT_MS+60=400 → afterSplash 再等 400。
-     v1.6.0 白起把 MIN_SHOW 從 950 拉到 1230 ⇒ 1230+400+400 = **2030ms** 才會有結果。
-     舊的 2100 只剩 70ms 餘裕（跟 jsdom 的排程抖動同一個量級）⇒ 拉到 2400。
+     v1.6.0 白起把 MIN_SHOW 從 950 拉到 1230 ⇒ 1230+400+400 = 2030ms 才會有結果 ⇒ 當時拉到 2400。
+     v1.6.2 再把 MIN_SHOW 拉到 1490（多了 --sp-lead 那一拍，見 §75e）
+     ⇒ 1490+400+400 = **2290ms**，2400 只剩 110ms 餘裕 ⇒ 拉到 2700。
      ⚠️ 這個數字跟著 splash.js 的 MIN_SHOW 走 —— 改 MIN_SHOW 要回來看這一行。
      ⚠️ 而且它是「等夠久」不是「等剛好」：太短會變成偽陰性（看起來像鑰匙圈壞了）。 */
-  const KR_WAIT = 2400;
+  const KR_WAIT = 2700;
 
   /* ① 正常：讀得到 → 寫進快取，但這一次的畫面不可以中途換字 */
   {
@@ -1038,8 +1051,8 @@ section("75b. 白起：第一幀是 #ebebeb，而且**只靠 index.html 自己**
      /\.sp-ring\{animation:none;\}/.test(NOWS(SC)),
     "★ 光環是用 animation:none 明確關掉的（§5 的 .sp-ring 是無條件帶動畫的，"
     + "靠「沒寫規則」關不掉，會在亮底上散出一圈沒人要的金環）");
-  ok(/html\[data-splash-intro="light"\]#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)bothvar\(--sp-sink\)/.test(NOWS(SC)),
-    "★ 名字的 delay ＝ --sp-sink（等底色沉完才出現：淺色字壓在亮底上讀不到）"
+  ok(/html\[data-splash-intro="light"\]#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)bothcalc\(var\(--sp-lead\)\+var\(--sp-sink\)\)/.test(NOWS(SC)),
+    "★ 名字的 delay ＝ --sp-lead ＋ --sp-sink（先等過盲窗，再等底色沉完才出現：淺色字壓在亮底上讀不到）"
     + "；fill-mode 是 both 不是 backwards —— 理由見 §75c");
 
   /* ⑤b 減少動態：白起整個關掉、退回深色第一幀。
@@ -1256,7 +1269,7 @@ section("75c. 第一次繪製那一幀 ＝ 動畫的起始狀態（符號與名�
   const N = NOWS(SC);
   ok(/#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)both/.test(N),
     "★ 印記變體的名字也是 both（那一版的名字本來就會 1 → 0 → 1，同一個病）");
-  ok(/\.sp-glyph\{animation:sp-emergecalc\(var\(--dur-3\)\+var\(--dur-1\)\)var\(--ease\)both;\}/.test(N),
+  ok(/\.sp-glyph\{animation:sp-emergecalc\(var\(--dur-3\)\+var\(--dur-1\)\)var\(--ease\)bothvar\(--sp-lead\);\}/.test(N),
     "★ 白起的符號是 both");
   ok(!/animation:sp-up[^;]*backwards/.test(N) && !/animation:sp-emerge[^;]*backwards/.test(N),
     "★ 而且沒有任何一條 sp-up／sp-emerge 還留著 backwards（留著就是演完會自己不見）");
@@ -1270,6 +1283,244 @@ section("75c. 第一次繪製那一幀 ＝ 動畫的起始狀態（符號與名�
   ok(/transform:scale\(var\(--scale-in\)\)/.test(NOWS(CRIT)) &&
      !/var\(--scale-in,/.test(NOWS(CRIT)),
     "★ 符號的起始縮放走 var(--scale-in)、而且**沒有**後備字面值");
+}
+
+
+/* ================================================================
+   §75e ⭐⭐ 開場**不可以在畫面被交到使用者眼前之前就已經演掉一段**（v1.6.2，2026-08-27）
+   ----------------------------------------------------------------
+   ⚠️⚠️ §75c 抓不到這個病，這一節不是它的加強版，是**另一把量不同東西的尺**：
+     §75c 比的是「第一幀 vs @keyframes 的 from」（**空間**上一不一樣）；
+     這一節管的是「使用者第一眼看到的時候，動畫的**時間**走到哪裡了」。
+     背景的 from 一直都是 --sp-start，§75c 從頭到尾都是綠的 —— 而 Benson 看到的是灰色。
+
+   Benson 第三次回報同一個位置怪。PM 逐格（59.94fps）拆他錄的**兩次開啟**，數字幾乎一樣：
+
+     第一次｜畫格 85 → 86 → 87   #c6c6c6 → #cdcdcd → #d4d4d4   iOS 還在平順淡向白（每格 +7）
+           ｜畫格 88            **#949494**                    ← 一格之內暗掉約 64 階
+           ｜畫格 89 → 92 → 100  #8f8f91 → #858487 → #5c5d61    之後又順順變深
+     第二次｜畫格 318–322        #c1c1c1 → #c8c8c8 → #cfcfcf → **#949396** → #909092
+
+   #949494 ＝「#ebebeb → #0b0d12」這條漸深走到 **39%**（三個通道各算一次都是 0.39）
+   ⇒ 漸深全長 700ms ⇒ **畫面被交出來的時候，開場已經跑了約 273ms**。
+   ⇒ 病根不是「第一幀畫錯」，是 **iOS 還在播它自己的啟動畫面時，我們的網頁已經在後面
+     繪製並且開始跑動畫了**；等它把畫面交出來，我們的漸深已經走掉四成。
+
+   ⚠️ 這也解釋了為什麼 iOS 的淡出從來沒有真的到達 #ebebeb（它在 #d4d4d4 就被交棒切斷）：
+      殘留的那個**變亮**小台階（#d4 → #eb，約 23 階）遠比原本那個**變暗**大台階（64 階）不刺眼，
+      而且它是 iOS 那一側的事，我們動不了。**不要為了消滅它去改 --sp-start。**
+
+   修法（PM 拍板的方向 1）：在漸深開始之前先靜止住一拍 `--sp-lead`，長到蓋得住那個盲窗。
+   ⛔ **不可以改用「把漸深變慢」來掩蓋** —— 放慢只是把台階變小，台階還在。
+      所以這一節量的是**延遲**，不是時長：把 --sp-sink 拉長不會讓任何一條斷言變綠。
+
+   這把尺怎麼量（三個自證）：
+     ① `--sp-lead` 從 css/motion.css ＋ css/splash.css 的 token **真的算一次**，不是抄一個數字；
+     ② 白起變體的動畫**全掃**（不是列白名單），逐條把 animation 簡寫裡的 delay 解析出來比對，
+        並配「掃到少於 4 條就是尺壞了」的自證；
+     ③ **負控組**：把 var(--sp-lead) 從那些簡寫裡拿掉（＝ v1.6.1 的寫法）再餵同一把尺，
+        必須四條全抓到。
+
+   另一把獨立的尺在 `scripts/probe/blind-window.mjs`（真 Chrome：模擬「畫面繪製後
+   延遲 N 毫秒才可見」，在那一刻凍住所有動畫、截圖讀像素）。這一節是靜態的，那支是像素的。
+   ================================================================ */
+section("75e. 開場在「畫面真的可見」之前不可以已經推進（盲窗 273ms）");
+{
+  const SC = noComment(SPLASHCSS);
+
+  /* Benson 螢幕錄影量到的盲窗。**這個數字是量出來的，不是設計參數** ——
+     要改請重新錄一次影片、重新逐格算，並把新的畫格數字寫進上面那段註解。 */
+  const BLIND_MS = 273;
+
+  /* ---- 小尺 1：把 var()／calc() 解析成毫秒（token 從兩支 CSS 的 :root 真的讀） ----
+     ⚠️ **先出現的贏**（不是後出現的贏）：motion.css 最後面的
+     @media (prefers-reduced-motion:reduce) 會把 --dur-* 全部覆寫成 1ms，
+     後者贏的話整把尺會量到「--sp-lead ＝ 2ms」然後對著正確的實作報錯 —— 那是尺壞了。
+     這一節量的是**一般情況**的時間軸；reduce 之下白起整個關掉（§7f），本來就不適用。 */
+  const TOK = {};
+  for (const src of [MOTION, SPLASHCSS]) {
+    for (const m of noComment(src).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;{}]+);/gi)) {
+      if (!(m[1] in TOK)) TOK[m[1]] = m[2].trim();
+    }
+  }
+  ok(TOK["--dur-press"] === "120ms",
+    "★ 尺沒壞：--dur-press 讀到的是一般情況的 120ms，不是 reduce 覆寫的 1ms（實際 "
+    + TOK["--dur-press"] + "）");
+  const subst = expr => {
+    let s = String(expr);
+    for (let i = 0; i < 12 && /var\(/.test(s); i++) {
+      s = s.replace(/var\(\s*(--[a-z0-9-]+)\s*(?:,[^()]*)?\)/gi, (all, n) => (n in TOK ? TOK[n] : all));
+    }
+    return s;
+  };
+  const ms = v => {
+    const m = /^(-?\d+(?:\.\d+)?)(ms|s)$/.exec(String(v).trim());
+    return m ? Number(m[1]) * (m[2] === "s" ? 1000 : 1) : null;
+  };
+  /* calc 只支援「時間 + 時間」與「時間 - 時間」，這份 CSS 裡就只有這兩種。
+     ⚠️ 不支援的寫法要回 null（＝尺壞了）而不是回 0 —— 回 0 會把「沒有延遲」說成合格。 */
+  const evalMs = expr => {
+    let s = subst(expr).replace(/\s+/g, " ").trim();
+    for (let i = 0; i < 6 && /calc\(/.test(s); i++) {
+      s = s.replace(/calc\(([^()]*)\)/i, (all, inner) => {
+        const parts = inner.split(/([+-])/).map(x => x.trim()).filter(x => x !== "");
+        let acc = ms(parts[0]);
+        if (acc === null) return "NaNms";
+        for (let k = 1; k < parts.length; k += 2) {
+          const v = ms(parts[k + 1]);
+          if (v === null) return "NaNms";
+          acc = parts[k] === "-" ? acc - v : acc + v;
+        }
+        return acc + "ms";
+      });
+    }
+    const v = ms(s);
+    return v === null || Number.isNaN(v) ? null : v;
+  };
+  ok(evalMs("var(--dur-3)") === 420 && evalMs("var(--sp-sink)") === 700 && evalMs("220ms") === 220,
+    "★ 尺沒壞：token 解析器算得出 --dur-3=420、--sp-sink=700");
+  ok(evalMs("var(--ease)") === null && evalMs("linear") === null,
+    "負控：不是時間的東西要回 null（回 0 的話「沒有延遲」會被說成合格）");
+  ok(evalMs("calc(var(--dur-3) + var(--dur-2))") === 700 && evalMs("calc(300ms - 120ms)") === 180,
+    "負控：calc 的加與減都算得對");
+
+  /* ---- 小尺 2：從 animation 簡寫裡取出 delay（規格：第一個 <time> 是時長、第二個是延遲）----
+     刻意先把整個簡寫解析成毫秒再依序取值，這樣 fill-mode／timing 擺在哪裡都不影響結果
+     （「屬性順序一換就繞過去」是這個 repo 踩過兩次的坑）。 */
+  const delayOf = shorthand => {
+    let s = subst(shorthand);
+    /* ⚠️ 一定要**跑到沒有 calc 為止**：--sp-lead 自己就是 calc，代換之後會變成
+       calc(calc(220ms+120ms) + calc(420ms+280ms))，單跑一輪只會攤平最裡面那兩層，
+       外層的 calc( 還在 ⇒ 340ms 與 700ms 被當成兩個獨立的時間值，delay 讀成 340 而不是 1040。 */
+    for (let i = 0; i < 8 && /calc\(/.test(s); i++) {
+      s = s.replace(/calc\(([^()]*)\)/gi, (all) => {
+        const v = evalMs(all);
+        return v === null ? all.replace(/calc\(/i, "CALCFAIL(") : v + "ms";
+      });
+    }
+    const times = [...s.matchAll(/(-?\d+(?:\.\d+)?)(ms|s)\b/g)]
+      .map(m => Number(m[1]) * (m[2] === "s" ? 1000 : 1));
+    return times.length >= 2 ? times[1] : (times.length === 1 ? 0 : null);
+  };
+  /* ⚠️ 這幾條自證刻意用**字面值**不用 var(--sp-lead)：用真 token 的話，token 一旦被改短，
+     這裡會跟著喊「尺沒壞」失敗而蓋過真正的錯誤訊息（X63 突變當場示範過）。 */
+  ok(delayOf("sp-sink 700ms linear 340ms forwards") === 340,
+    "★ 尺沒壞：簡寫解析器讀得到寫在 timing 後面的 delay（340ms）");
+  ok(delayOf("sp-sink var(--sp-sink) linear forwards") === 0,
+    "負控：沒寫 delay 就是 0（這正是 v1.6.1 的寫法，必須被判成不合格）");
+  ok(delayOf("sp-up var(--dur-3) var(--ease) both calc(var(--sp-lead) + var(--sp-sink))") === 1040,
+    "負控：delay 寫在 fill-mode 後面、而且是 calc 也讀得到（1040ms）");
+
+  /* ---- ① --sp-lead 本身：由既有 token 算出來，而且蓋得住盲窗 ---- */
+  ok(/--sp-lead:\s*calc\(\s*var\(--sp-hold\)\s*\+\s*var\(--dur-press\)\s*\)/.test(SC),
+    "★ --sp-lead 是由 --sp-hold ＋ --dur-press 算出來的（沒有引進新時長）");
+  const LEAD = evalMs(TOK["--sp-lead"]);
+  ok(LEAD === 340, "★ 尺沒壞：--sp-lead 實際算出來是 " + LEAD + "ms（220 ＋ 120）");
+  ok(LEAD >= BLIND_MS,
+    "★★ 那一拍蓋得住盲窗：--sp-lead " + LEAD + "ms ≥ 螢幕錄影量到的 " + BLIND_MS +
+    "ms（餘裕 " + (LEAD - BLIND_MS) + "ms ≒ " + ((LEAD - BLIND_MS) / 16.7).toFixed(1) + " 格）");
+
+  /* ---- ② 白起變體的動畫全掃：每一條的 delay 都要蓋得住盲窗 ----
+     全掃不是白名單：以後 §7 多加一拍（例如 tagline），這裡自動跟著驗。 */
+  /* 走訪「葉節點規則」（body 裡沒有巢狀大括號的那種）。
+     ⚠️ 刻意不用「(?:^|[};]) 開頭」的正則掃描：global 正則會把前一條規則的 `}` 一起吃掉，
+        下一條就失去錨點而被**安靜跳過** —— 第一版真的只掃到 4 條裡的 2 條，
+        而且錯誤訊息長得像實作壞了。@media 會被自動攤平、@keyframes 的 from/to
+        也會被走訪到（但它們的選擇器沒有 data-splash-intro，下面會濾掉）。 */
+  const leafRules = css => {
+    const out = [];
+    const walk = (start, end) => {
+      let sel = "", i = start;
+      while (i < end) {
+        const c = css[i];
+        if (c === "{") {
+          let depth = 1, j = i + 1;
+          while (j < end && depth > 0) { if (css[j] === "{") depth++; else if (css[j] === "}") depth--; j++; }
+          const body = css.slice(i + 1, j - 1);
+          if (body.indexOf("{") < 0) out.push({ sel: sel.replace(/\s+/g, " ").trim(), body });
+          else walk(i + 1, j - 1);
+          sel = ""; i = j;
+        } else if (c === "}") { sel = ""; i++; }
+        else { sel += c; i++; }
+      }
+    };
+    walk(0, css.length);
+    return out;
+  };
+  ok(leafRules("a{x:1}@media(q){b{y:2}}").map(r => r.sel).join(",") === "a,b",
+    "負控：走訪器攤得平 @media，而且不會把前一條的 } 吃掉害下一條被跳過");
+
+  const lightAnims = css => {
+    const out = [];
+    for (const r of leafRules(css)) {
+      if (r.sel.indexOf('data-splash-intro="light"') < 0) continue;
+      const a = /(?:^|[;{])\s*animation\s*:\s*([^;}]+)/.exec(r.body);
+      if (!a) continue;
+      const val = a[1].trim();
+      if (/^none$/i.test(val)) continue;          /* 明確關掉的（光環、reduce）不可能推進 */
+      out.push({ sel: r.sel, val, delay: delayOf(val) });
+    }
+    return out;
+  };
+  const anims = lightAnims(SC);
+  ok(anims.length >= 4,
+    "★ 尺沒壞：白起變體掃到 " + anims.length + " 條會動的動畫（底色、漸深層、符號、名字）",
+    anims.map(a => a.sel).join(" ｜ "));
+  const early = anims.filter(a => a.delay === null || a.delay < BLIND_MS);
+  ok(early.length === 0,
+    "★★ 每一條開場動畫都要等過盲窗才起跑（不是只有底色那一條）",
+    early.map(a => a.sel + " delay=" + a.delay).join(" ｜ "));
+  for (const a of anims) {
+    ok(a.delay >= BLIND_MS,
+      "★ " + a.sel + "：delay " + a.delay + "ms ≥ " + BLIND_MS + "ms");
+  }
+
+  /* ---- ③ 負控組：拿掉那一拍（＝ v1.6.1 的寫法），四條都必須被抓到 ---- */
+  {
+    const OLD = SC
+      .split(" var(--sp-lead) forwards").join(" forwards")
+      .split(" both var(--sp-lead);").join(" both;")
+      .split("both calc(var(--sp-lead) + var(--sp-sink))").join("both var(--sp-sink)");
+    ok(OLD !== SC, "負控：改寫真的套用了（目標字串失配就會安靜地量出假綠燈）");
+    const caught = lightAnims(OLD).filter(a => a.delay === null || a.delay < BLIND_MS);
+    /* ⚠️ 這裡刻意是 3 不是 4：v1.6.1 的名字本來就 delay=--sp-sink=700ms，
+       700 > 273 ⇒ 它從來沒有在盲窗裡偷跑過（Benson 的錄影也沒拍到名字有問題）。
+       這把尺**分得出**「delay 0 的三條」與「delay 700 的那一條」，才叫量對了東西；
+       要求它抓到 4 條反而是在逼尺說謊。 */
+    ok(caught.length === 3,
+      "負控：退回 v1.6.1 的寫法時，delay 是 0 的那三條（<html> 底色、漸深層、符號）全部被抓到（抓到 "
+      + caught.length + " 條）",
+      caught.map(a => a.sel + " delay=" + a.delay).join(" ｜ "));
+    /* 而且要抓在正確的東西上：漸深那一層（使用者看到的顏色就是它）一定要在名單裡 */
+    ok(caught.some(a => a.sel.indexOf("::before") >= 0),
+      "負控：漸深那一層（#splash::before）一定要被點名 —— Benson 看到的灰色就是它");
+    ok(caught.every(a => a.delay === 0),
+      "負控：被抓到的都是 delay=0（不是尺把「有延遲但不夠長」跟「完全沒延遲」混在一起）");
+    ok(!caught.some(a => a.sel.indexOf(".sp-name") >= 0),
+      "負控：名字**不該**被抓到 —— 它 v1.6.1 就已經 delay=700ms、蓋得住盲窗，"
+      + "尺要分得出這件事（抓到它才代表尺在亂咬）");
+  }
+
+  /* ---- ④ 不可以用「把漸深變慢」來掩蓋 ----
+     漸深長度仍然是 --dur-3 ＋ --dur-2（沒有被偷偷拉長），台階是靠延遲消滅的不是靠拉長。 */
+  ok(evalMs(TOK["--sp-sink"]) === 700,
+    "★ 漸深仍然是 700ms（拉長它不會讓上面任何一條變綠，這裡再釘一次擋人走回頭路）");
+
+  /* ---- ⑤ 那一拍只加在白起變體上，沒有波及預設（印記）---- */
+  const leadUses = [...SC.matchAll(/var\(--sp-lead\)/g)].length;
+  ok(leadUses === 4, "★ 尺沒壞：var(--sp-lead) 一共被用了 " + leadUses + " 次");
+  ok(anims.filter(a => a.val.indexOf("--sp-lead") >= 0).length === 4,
+    "★ 而且四次全部落在 data-splash-intro=\"light\" 的規則裡（預設變體一個字都沒被動到）");
+  {
+    const sig = leafRules(SC).filter(r => r.sel.indexOf("data-splash-intro") < 0 &&
+      /(?:^|[;{])\s*animation\s*:/.test(r.body) &&
+      !/^none$/i.test((/(?:^|[;{])\s*animation\s*:\s*([^;}]+)/.exec(r.body) || [, ""])[1].trim()));
+    ok(sig.length >= 3,
+      "★ 尺沒壞：預設（印記）變體有 " + sig.length + " 條會動的動畫（符號呼吸、光環、名字…）");
+    const breathe = sig.find(r => r.body.indexOf("s-breathe") >= 0);
+    ok(breathe && delayOf((/(?:^|[;{])\s*animation\s*:\s*([^;}]+)/.exec(breathe.body) || [, ""])[1]) === 400,
+      "★ 印記變體的符號仍然是 --sp-hold ＋ --dur-1 ＝ 400ms 起跑（沒有被順手一起改掉）");
+  }
 }
 
 /* ================================================================
@@ -1533,7 +1784,7 @@ section("78b2. 開場播放中的遮罩：三條逃生路真的跑一次（不�
     const { w, d } = await boot({ store: ST, beforeEval: withSplash() });
     ok(!!d.getElementById("splash"), "（前提）冷啟動，開場在畫面上");
     ok(d.documentElement.getAttribute("data-splash") !== "off", "（前提）遮罩此時是成立的");
-    await tick(w, 1400);
+    await tick(w, 1650);
     const sp = d.getElementById("splash");
     ok(!sp || sp.classList.contains("out") ,
       "★ 最短顯示過後：#splash 帶著 .out（遮罩放行、App 與收場交叉淡入）或已經離開 DOM");

@@ -73,3 +73,26 @@ node scripts/probe/first-frame.mjs --delay=1200    # 把 CSS 的窗口撐得更�
 - 順便斷言 `#splash` 在第一次繪製那一幀就蓋滿整個 viewport，
   而且 `elementFromPoint(中央, innerHeight-1)` 落在 `#splash` 裡。
 - exit 0 過／1 有東西在跳／2 尺壞了（沒取到樣、找不到 Chrome）。
+
+## `blind-window.mjs`（2026-08-27 v1.6.2 新增）
+
+驗**「開場有沒有在畫面真的被交到使用者眼前之前就演掉一段」**。
+`first-frame.mjs` 比的是「第一幀 vs 動畫的 `from`」（空間），這一支比的是
+「使用者第一眼看到的時候，動畫的**時間**走到哪裡了」——**兩件事，前者抓不到後者**。
+
+```bash
+node scripts/probe/blind-window.mjs                 # 預設盲窗 280ms
+node scripts/probe/blind-window.mjs --blind=273     # Benson 錄影量到的那一格
+node scripts/probe/blind-window.mjs --blind=400     # 想知道餘裕吃完會多難看
+```
+
+- 取樣點用**頁面自己的時鐘**：從「三支 link 的 `media` 都變成 `all`」起算 N 毫秒。
+- ⚠️ **那一刻先 `document.getAnimations().forEach(a => a.pause())` 再截圖**：
+  CDP 從發指令到真的拍到會拖 60~90ms，不凍住的話量到的是「更後面」的顏色
+  （實測 `#858688` vs 正確的 `#909193`）。`pause()` 之後**要再等一幀**讓樣式重算落定。
+- 三個自證：①那一刻真的有動畫可以凍（`getAnimations().length > 0`）；
+  ②凍住之後 computed style 不再變（凍不住就直接判尺壞了）；
+  ③**負控組**＝把 `--sp-lead` 那一拍從 `css/splash.css` 拿掉（＝ v1.6.1 的寫法）再量一次，
+  必須翻紅、而且量到的顏色要落在 Benson 錄影的那個灰附近。
+- 起始色是**從 `css/splash.css` 的 `--sp-start` 讀的**，不在腳本裡抄第二份。
+- exit 0 過／1 可見那一刻動畫已經推進／2 尺壞了。

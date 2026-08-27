@@ -284,6 +284,31 @@ html:not([data-splash="off"]){background:var(--splash-bg);}
   /* 白 → --splash-bg 的漸變長度。刻意由既有 token 相加而來（420 + 280 = 700ms），
      不引進新的時長 —— 沉穩基調是已定案的，這裡只是換一種構圖。 */
   --sp-sink:calc(var(--dur-3) + var(--dur-2));
+  /* ⭐⭐ 起跑前先靜止住的那一拍（v1.6.2，2026-08-27）。
+     ------------------------------------------------------------
+     **這不是留白，是在補一段「畫面已經畫好、但還沒被交到使用者眼前」的盲窗。**
+     iOS 從主畫面開 PWA 時，它自己的啟動畫面**還在淡出**，而我們的 WKWebView
+     已經在後面繪製、CSS 已經套用、動畫已經開始跑。等 iOS 把畫面交出來，
+     開場已經演掉一段 ⇒ 使用者看到的第一幀不是白的，是漸深走到一半的灰。
+     Benson 的螢幕錄影逐格（59.94fps，兩次開啟各量一次、數字幾乎一樣）：
+       iOS 還在平順淡向白：#c6c6c6 → #cdcdcd → #d4d4d4（每格 +7）
+       下一格突然掉到     #949494        ← 交棒，我們的畫面現形
+       之後又順順變深     #8f8f91 → #858487 → #5c5d61
+     #949494 ＝ 這條漸深走到 **39%** 的位置 ⇒ 盲窗約 **273ms**。
+     （本機真 Chrome 交叉驗過：把「CSS 套用後 273ms 才可見」模擬出來，
+       量到的像素是 #909193／opacity 0.406 —— 跟他錄到的差不到一格。）
+
+     ⚠️ 這一拍**不可以**拿來當「把漸深放慢」的替代品：放慢只是把台階變小，
+        台階還在；靜止住才是讓使用者看到的第一幀真的等於起始狀態。
+     ⚠️ 值刻意由既有 token 相加（220 + 120 = 340ms），不引進新時長；
+        340 對 273 留 67ms（約 4 格）餘裕。
+        **餘裕給多了不難看**：多出來的時間畫面停在 --sp-start，跟 iOS 交出來的白
+        是同一片白，看起來什麼都沒發生 —— 唯一的代價是開場變長。
+        **給少了也是漸進劣化**：少 50ms 只會讓使用者看到漸深走了 7%（約 16 階亮度），
+        遠小於原本那個 64 階的台階。
+     ⚠️ 改這個值要回頭改 motion/splash.js 的 MIN_SHOW（開場得播得完），
+        那邊有一條註解寫著同一件事。 */
+  --sp-lead:calc(var(--sp-hold) + var(--dur-press));
 }
 
 /* 7a. 底色：<html> 也要一起沉。
@@ -293,7 +318,7 @@ html:not([data-splash="off"]){background:var(--splash-bg);}
    三個時機的顏色都必須跟開場一致，所以這裡跑同一條時間線。 */
 html[data-splash-intro="light"]:not([data-splash="off"]){
   background:var(--sp-start);
-  animation:sp-sink-bg var(--sp-sink) linear forwards;
+  animation:sp-sink-bg var(--sp-sink) linear var(--sp-lead) forwards;
 }
 @keyframes sp-sink-bg{
   from{background-color:var(--sp-start);}
@@ -306,7 +331,7 @@ html[data-splash-intro="light"] #splash::before{
   content:""; position:absolute; inset:0;
   background:var(--splash-bg);
   opacity:0;
-  animation:sp-sink var(--sp-sink) linear forwards;
+  animation:sp-sink var(--sp-sink) linear var(--sp-lead) forwards;
 }
 @keyframes sp-sink{ from{opacity:0;} to{opacity:1;} }
 
@@ -316,7 +341,7 @@ html[data-splash-intro="light"] #splash::before{
 html[data-splash-intro="light"] #splash .sp-glyph{
   /* fill-mode `both` 的理由跟 §5 的名字一模一樣（第一幀 ＝ 起始狀態 ⇒ 靜態值是
      opacity:0 ⇒ 終點只能靠動畫自己撐）。#splash 不可互動，代價是 0。 */
-  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) both;
+  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) both var(--sp-lead);
 }
 @keyframes sp-emerge{
   from{opacity:0; transform:scale(var(--scale-in));}
@@ -330,7 +355,7 @@ html[data-splash-intro="light"] .sp-ring{ animation:none; }
 
 /* 7e. 名字：等底色沉到深色才出現（見上面的決定 ③） */
 html[data-splash-intro="light"] #splash .sp-name{
-  animation:sp-up var(--dur-3) var(--ease) both var(--sp-sink);
+  animation:sp-up var(--dur-3) var(--ease) both calc(var(--sp-lead) + var(--sp-sink));
 }
 
 /* 7f. 減少動態：白起**整個關掉**，退回深色的第一幀。
