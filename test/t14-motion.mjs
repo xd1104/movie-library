@@ -21,6 +21,9 @@ const MOTION = read("css/motion.css");
 const APPCSS = read("css/app.css");
 const SPLASHCSS = read("css/splash.css");
 const SPLASHJS = read("js/splash.js");
+/* ⭐ v1.5.0 拆檔：第一幀那一小段（外觀變數、冷熱啟動、CSS 閘門、onColor）
+   搬到 js/splash-boot.js，它是唯一還留在 <head> 的同步腳本。 */
+const BOOTJS = read("js/splash-boot.js");
 const APPJS = read("js/app.js");
 const SW = read("sw.js");
 const MF = JSON.parse(read("manifest.webmanifest"));
@@ -32,8 +35,31 @@ const noComment = s => s.replace(/\/\*[\s\S]*?\*\//g, "")
   .split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
 const MOTION_C = noComment(MOTION);
 const SPLASHJS_C = noComment(SPLASHJS);
+const BOOTJS_C = noComment(BOOTJS);
 const APPJS_C = noComment(APPJS);
 const NOWS = s => s.replace(/\s+/g, "");
+
+/* ⭐ v1.5.0：splash-boot 是 inline 在 index.html 的柵欄裡（不是 <script src>）。
+   抽取器刻意**一個正則都不用**（全部 indexOf/slice）：它是「守衛的守衛」，愈笨愈好。 */
+const BOOT_BEGIN = "<!-- SPLASH-BOOT-INLINE:BEGIN";
+const BOOT_END = "<!-- SPLASH-BOOT-INLINE:END -->";
+const TAG_OPEN = "<script>";
+const TAG_CLOSE = "</" + "script>";
+function inlineBootBlock(raw) {
+  if (!raw) return null;
+  const b = raw.indexOf(BOOT_BEGIN), e = raw.indexOf(BOOT_END);
+  if (b < 0 || e < 0 || e < b) return null;
+  const seg = raw.slice(b, e + BOOT_END.length);
+  const s1 = seg.indexOf(TAG_OPEN), s2 = seg.indexOf(TAG_CLOSE);
+  if (s1 < 0 || s2 < 0 || s2 < s1) return null;
+  let body = seg.slice(s1 + TAG_OPEN.length, s2);
+  if (body.charAt(0) === "\r") body = body.slice(1);
+  if (body.charAt(0) === "\n") body = body.slice(1);
+  return body;
+}
+/* 比對一律在 LF 空間做（這個 repo 是 CRLF、範本是 LF，不正規化會「紅在行尾」而不是「紅在程式分岔」） */
+const toLF = x => String(x).split("\r\n").join("\n");
+const sha = x => crypto.createHash("sha256").update(toLF(x)).digest("hex");
 
 /* 從 index.html 裡把那段 inline 的 SPLASH_CONFIG 挖出來（要在 jsdom 裡真的跑它） */
 const CFG_SRC = (/<script>\s*([\s\S]*?window\.SPLASH_CONFIG[\s\S]*?)<\/script>/.exec(IDX) || [])[1] || "";
@@ -58,13 +84,25 @@ function contrast(a, b) {
   return (x + 0.05) / (y + 0.05);
 }
 
-/* 讓 jsdom 也跑 SPLASH_CONFIG ＋ js/splash.js（harness 會把所有 <script src> 拿掉，
-   所以平常 t1～t13 都是在「沒有 Splash」的狀態下跑的 ＝ 天然負控組）。 */
+/* 讓 jsdom 也跑 SPLASH_CONFIG ＋ js/splash-boot.js ＋ js/splash.js
+   （harness 會把所有 <script src> 拿掉，所以平常 t1～t13 都是在「沒有 Splash」的
+     狀態下跑的 ＝ 天然負控組）。
+   ⚠️ 順序不可以顛倒：splash.js 靠 window.SplashBoot 才跑得起來（v1.5.0 拆檔）。 */
 function withSplash(extra) {
   return function (w) {
     if (extra) extra(w);
     w.eval(CFG_SRC);
+    w.eval(BOOTJS);
     w.eval(SPLASHJS);
+  };
+}
+/* 只跑 boot、不跑 splash.js ＝ 模擬「js/splash.js 沒載到」（部署漏檔、離線）。
+   §78 用它壓測交棒保險絲。 */
+function withBootOnly(extra) {
+  return function (w) {
+    if (extra) extra(w);
+    w.eval(CFG_SRC);
+    w.eval(BOOTJS);
   };
 }
 
@@ -140,25 +178,119 @@ section("62. 載入順序（錯了就會「先畫預設再跳字」或 token 拿
   const iMo = IDX.indexOf('href="./css/motion.css"');
   const iSp = IDX.indexOf('href="./css/splash.css"');
   const iCfg = IDX.indexOf("window.SPLASH_CONFIG");
+  const iBoot = IDX.indexOf(BOOT_BEGIN);          /* v1.5.0：boot 是 inline 在柵欄裡，不是 <script src> */
   const iJs = IDX.indexOf('src="./js/splash.js"');
   const iHead = IDX.indexOf("</head>");
   const iAppJs = IDX.indexOf('src="./js/app.js"');
-  ok(iApp >= 0 && iMo >= 0 && iSp >= 0 && iCfg >= 0 && iJs >= 0, "五個東西都在（尺沒壞）");
+  ok(iApp >= 0 && iMo >= 0 && iSp >= 0 && iCfg >= 0 && iBoot >= 0 && iJs >= 0, "六個東西都在（尺沒壞）");
   ok(iApp < iMo, "★ app.css 在 motion.css 之前（同權重時後宣告者勝，動效才蓋得過既有規則）");
   ok(iMo < iSp, "★ motion.css 在 splash.css 之前（splash 要吃 --dur-* token）");
-  ok(iCfg < iJs, "★ SPLASH_CONFIG 在 splash.js 之前");
-  ok(iJs < iHead, "★ splash.js 在 </head> 之前（body 還沒解析就把外觀設好）");
-  ok(iJs < iAppJs, "★ splash.js 在 app.js 之前");
+  ok(iCfg < iBoot, "★ SPLASH_CONFIG 在 inline 的 splash-boot 之前（boot 一跑就會讀它）");
+  ok(iBoot < iJs, "★ splash-boot 在 splash.js 之前（splash.js 靠 window.SplashBoot 才跑得起來）");
+  ok(iJs < iAppJs, "★ splash.js 在 app.js 之前（app.js 一開頭就會呼叫 Splash.hold()）");
+
+  /* ⭐⭐ 契約變更（v1.5.0，2026-08-27，PM 授權）：
+     舊契約是「splash.js 在 </head> 之前」。**新契約把那條規則轉移到 splash-boot 身上**，
+     而且反過來要求 splash.js **不可以**留在 <head>。
+
+     為什麼改：Benson 的螢幕錄影逐格拆開後，真機第一次繪製是 0.73s（點下圖示後 0.87s），
+     而 iOS 大約在 0.50s 就開始把自己的啟動畫面淡出 ⇒ 中間那段露出 WKWebView 的白底。
+     那是**賽跑**不是漸進優化：趕在淡出之前畫出第一幀，白色會整個消失、不是變短。
+     舊結構的 <head> 裡站著三支 CSS ＋ 一支 17KB 的 splash.js，四個檔案全部是
+     「畫出第一幀之前非到齊不可」。
+
+     ⚠️ 舊契約要守的東西一個都沒有放掉，只是換了守衛的對象：
+        「body 解析前就把外觀寫成 CSS 變數 ⇒ 不可能先畫預設再中途換字」
+        現在由 <head> 裡 inline 的 splash-boot 負責（§62b ＋ §71 真的跑一遍驗證）。 */
+  ok(iBoot < iHead, "★ inline 的 splash-boot 在 </head> 之前（body 還沒解析就把外觀設好）");
+  ok(iJs > iHead, "★ splash.js **在 </head> 之後**（v1.5.0 契約：它 17KB，第一次繪製一個位元組都用不到）");
+
+  /* ⭐ 第二版（2026-08-27 下午）：boot 從「外部 <script src>」改成「inline 在柵欄裡」，
+     第一次繪製之前必須到齊的**同源請求數 2 → 1**。所以這裡要擋「有人把它改回外部檔」。 */
+  ok(!/<script[^>]*src="[^"]*splash-boot\.js"[^>]*>/.test(IDX),
+    "★ splash-boot **不是**外部 <script src>（改回去就等於第一次繪製之前又多一個同源請求）");
+
   /* ⚠️ 這裡要抓整個標籤再驗屬性，**不可以寫成「src 後面不准接 defer」**：
      `<script defer src="…">` 屬性順序一換就繞過去了。
      （2026-08-25 突變測試 X15 實抓：第一版就是這樣寫的，127 條裡唯一沒守住的就是它。） */
   const spTag = (/<script[^>]*src="\.\/js\/splash\.js"[^>]*>/.exec(IDX) || [""])[0];
   ok(!!spTag, "撈得到 splash.js 那個 script 標籤（尺沒壞）：" + spTag);
   ok(!/\b(defer|async|type="module")\b/.test(spTag),
-    "★ 是同步 script，沒有 defer／async／module（有的話就不保證「不會中途換字」）", spTag);
+    "★ splash.js 是同步 script：同步一定跑在 defer 之前，才保證 window.Splash 早於 app.js", spTag);
   ok(/<div id="splash" aria-hidden="true">/.test(IDX), "body 最前面有 #splash（而且 aria-hidden）");
   ok(/<div class="sp-glyph"><\/div>/.test(IDX) && /<div class="sp-name"><\/div>/.test(IDX),
     "★ 符號與名字的元素刻意是空的（文字由 CSS content 畫，才不會先畫預設再換）");
+}
+
+/* ================================================================
+   §62b 第一次繪製前只准一個同源請求 ＋ inline 的 splash-boot 不可以跟正本分岔
+   ----------------------------------------------------------------
+   ⭐ 這一節守的是 v1.5.0 的核心賭注：**第一次繪製之前必須到齊的同源請求數 ＝ 1**
+      （只有 index.html）。桌機量不出差別（Service Worker 派送幾乎免費），
+      但 iPhone 上每一個經過 SW 的子資源都要付一次 WKWebView 的代價。
+      所以這件事**不能用時間去量，要用結構去斷言**。
+
+   ⭐ 分岔判準：**LF 正規化之後逐位元組相同**（連註解都要一樣）。
+      PM 原本建議「剝掉註解＋壓縮空白再比」，我刻意沒有那樣做——
+      splash-boot.js 裡有 "https://xd1104.github.io/…" 這種**字串裡的 //**，
+      天真的註解剝除器會把它當行註解、把後面整段吃掉；剝除器只要在**寬鬆的方向**出錯，
+      守衛就會在「程式其實已經分岔」時放行 ＝ 尺壞了但一片綠。
+      而不剝的代價是 index.html 多約 14KB —— 那 14KB 本來就要傳（原本是 splash-boot.js
+      那個獨立請求），只是換條路走，而且它在 SW 殼快取裡。
+      ⇒ 逐位元組是**更嚴格**的守衛，成本卻是零。
+   ================================================================ */
+section("62b. 第一次繪製只靠 index.html 一個請求；inline 的 boot 不可以跟正本分岔");
+{
+  const inlineBoot = inlineBootBlock(IDX);
+  ok(inlineBoot !== null, "★ 撈得到柵欄裡的 boot 副本（撈不到＝這一整節等於沒跑）");
+
+  /* ① 分岔：index.html 的副本 vs 本 repo 的 js/splash-boot.js（§74 再把它釘在範本正本上） */
+  ok(inlineBoot !== null && sha(inlineBoot) === sha(BOOTJS),
+    "★ inline 的 splash-boot 跟 js/splash-boot.js **逐位元組相同**（LF 正規化後 SHA-256）"
+    + (inlineBoot === null ? "" : "：" + sha(BOOTJS).slice(0, 12) + "…"));
+  /* 負控組：證明這條比對不是恆真 */
+  ok(sha("a") !== sha("b"), "負控：不同內容的 SHA 必須不同");
+  ok(sha("a\r\nb") === sha("a\nb"), "負控：CRLF 與 LF 必須被正規化成一樣（否則會紅在行尾而不是紅在程式）");
+  ok(inlineBoot === null || sha(inlineBoot + " ") !== sha(BOOTJS),
+    "負控：多一個空白就必須算分岔（判準真的是逐位元組）");
+  ok(inlineBootBlock("<html>沒有柵欄</html>") === null, "負控：沒有柵欄時抽取器要回 null，不可以回空字串");
+
+  /* ② onColor 的真相來源只有一份：index.html 裡出現的每一份，都必須就是柵欄裡那一份 */
+  const nAll = IDX.split("function onColor").length - 1;
+  const nIn = inlineBoot === null ? -1 : inlineBoot.split("function onColor").length - 1;
+  ok(nIn === 1, "★ 柵欄裡剛好有 1 份 function onColor（實際 " + nIn + "）");
+  ok(nAll === nIn, "★ index.html 裡的 " + nAll + " 份 onColor 全部都在柵欄裡（沒有人在外面另寫一份）");
+  ok(!/function\s+onColor/.test(SPLASHJS), "★ splash.js 仍然沒有自己的 onColor（走 SplashBoot.onColor）");
+
+  /* ③ 逐字貼進 script 的兩個致命字串（貼進去 HTML 解析器會提早關掉 script，
+        程式碼變成畫面上的文字，而且看起來只是「怪」、不會報錯） */
+  ok(inlineBoot === null || inlineBoot.toLowerCase().indexOf("</" + "script") < 0,
+    "★ 柵欄裡沒有 </script（有的話 script 會被提早關掉）");
+  ok(inlineBoot === null || (inlineBoot.indexOf("<!--") < 0 && inlineBoot.indexOf("-->") < 0),
+    "★ 柵欄裡沒有 <!-- 或 -->（會跟柵欄自己的註解打架）");
+
+  /* ④ ⭐ 結構性斷言：第一次繪製之前必須到齊的同源請求 ＝ 只有 index.html
+        判準有二：<head> 裡不准有任何 <script src>；每一支樣式表 <link> 都必須是非阻塞的。 */
+  const head = IDX.slice(0, IDX.indexOf("</head>"));
+  const headSrc = [...head.matchAll(/<script[^>]*\bsrc="([^"]+)"[^>]*>/g)].map(m => m[1]);
+  ok(headSrc.length === 0,
+    "★ <head> 裡一支 <script src> 都沒有（實際 " + headSrc.length + " 支："
+    + (headSrc.join(", ") || "無") + "）—— 那是唯一還會擋住第一次繪製的東西");
+  const IDX_NC2 = IDX.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, " "));
+  const liveLinks2 = [...IDX_NC2.matchAll(/<link\b[^>]*>/g)]
+    .filter(m => /rel="stylesheet"/.test(m[0]))
+    .filter(m => !/<noscript/.test(IDX_NC2.slice(Math.max(0, m.index - 400), m.index)) ||
+                 /<\/noscript>/.test(IDX_NC2.slice(Math.max(0, m.index - 400), m.index)));
+  ok(liveLinks2.length >= 3, "★ 尺沒壞：掃到 " + liveLinks2.length + " 支正式樣式表 <link>");
+  const blocking = liveLinks2.filter(m => !/media="print"/.test(m[0]));
+  ok(blocking.length === 0,
+    "★ 沒有任何 render-blocking 的樣式表（實際 " + blocking.length + " 支阻塞）"
+    + (blocking.length ? "：" + blocking.map(m => m[0].slice(0, 60)).join(" | ") : ""));
+  /* 負控：這兩條判準要證明它們會回 false */
+  ok(/<script[^>]*\bsrc="([^"]+)"[^>]*>/.test('<script src="./js/x.js"></script>'),
+    "負控：head 掃描器抓得到一般的 <script src>");
+  ok(!/media="print"/.test('<link rel="stylesheet" href="./css/app.css">'),
+    "負控：一支普通的阻塞式 <link> 必須被判成阻塞");
 }
 
 /* ================================================================
@@ -417,9 +549,13 @@ section("71b. 熱啟動不重播（切分頁、返回、重新整理同一個 se
   ok(!d.getElementById("splash"), "★ 開場節點直接不存在");
   await tick(w, 200);
   ok(d.querySelectorAll(".row[data-open]").length === 6, "片單照常");
-  ok(!/visibilitychange|pageshow/.test(SPLASHJS_C), "★ 沒有掛在 visibilitychange／pageshow 上重播");
-  ok(/sessionStorage/.test(SPLASHJS_C) && !/localStorage\.getItem\(SEEN_KEY\)/.test(SPLASHJS_C),
+  /* ⚠️ 兩支都要掃：拆檔之後「冷熱啟動判斷」住在 boot、「收場」住在 splash.js，
+     只掃其中一支等於這條規則有一半沒人看（上一輪範本退件的同型缺陷）。 */
+  ok(!/visibilitychange|pageshow/.test(SPLASHJS_C + "\n" + BOOTJS_C),
+    "★ 沒有掛在 visibilitychange／pageshow 上重播（splash.js ＋ splash-boot.js 兩支都掃）");
+  ok(/sessionStorage/.test(BOOTJS_C) && !/localStorage\.getItem\(SEEN_KEY\)/.test(BOOTJS_C),
     "★ 冷啟動判斷用 sessionStorage（localStorage 會變成一輩子只播一次）");
+  ok(!/sessionStorage/.test(SPLASHJS_C), "★ 而且冷啟動判斷只有一份（splash.js 裡沒有第二套）");
 }
 
 section("71c. 減少動態：開場照樣收得掉，而且縮短");
@@ -455,7 +591,8 @@ section("71d. 保險絲：app 永遠不叫 ready() 也一定會收");
   ok(/W\.setTimeout\(function \(\) \{ dismiss\(\); \}, FUSE\);/.test(SPLASHJS) &&
     /W\.setTimeout\(function \(\) \{ hardRemove\(\); \}, FUSE \+ 1500\);/.test(SPLASHJS),
     "★ 而且是兩條互相獨立的保險絲（收場 + 硬移除）");
-  ok(!/animationend/.test(SPLASHJS_C), "★ 收屍不掛 animationend（沒觸發＝整個 App 打不開）");
+  ok(!/animationend/.test(SPLASHJS_C + "\n" + BOOTJS_C),
+    "★ 收屍不掛 animationend（沒觸發＝整個 App 打不開）—— 兩支都掃");
 }
 
 section("71e. 沒有 splash.js 的時候（離線、部署漏檔）App 一樣完整可用");
@@ -501,7 +638,22 @@ section("72. 符號字色由 onColor() 算，不是設定項，也不可以寫�
   ok(!/--splash-on-accent/.test(CFG_SRC) && !STYLE_BLOCKS.some(b => /--splash-on-accent\s*:/.test(b)),
     "★ 沒有任何地方把這個色票宣告成落地設定（多一個可調色票就多一種「調成看不見」的可能），"
     + "掃了 SPLASH_CONFIG ＋ 全部 " + STYLE_BLOCKS.length + " 塊 <style>");
-  ok(/setVar\("--splash-on-accent", onColor\(look\.accent\)\)/.test(SPLASHJS), "★ 它是 onColor(accent) 算出來的");
+  /* ⭐ v1.5.0 的第一鐵律：onColor 的**真相來源**只准有一份。
+     現在 index.html 裡確實有一份（inline 的 boot），但那是柵欄裡的逐字副本，
+     §62b 用 SHA-256 釘死它不准跟 js/splash-boot.js 分岔。
+     ⚠️ 所以這裡的判準不是「index.html 裡不准出現 onColor」（那已經不成立了），
+        而是「出現的每一份都必須在柵欄裡」。 */
+  ok(/function onColor\(bg\)/.test(BOOTJS) && !/function onColor/.test(SPLASHJS),
+    "★ onColor() 的定義只在 splash-boot（splash.js 走 SplashBoot.onColor）");
+  ok(/function relLum\(hex\)/.test(BOOTJS) && !/function relLum/.test(SPLASHJS),
+    "★ relLum() 同理，只有一份");
+  {
+    const ib = inlineBootBlock(IDX);
+    const nAll = IDX.split("function onColor").length - 1;
+    const nIn = ib === null ? -1 : ib.split("function onColor").length - 1;
+    ok(nAll === 1 && nIn === 1,
+      "★ index.html 裡的 onColor 剛好 1 份、而且就在柵欄裡（全部 " + nAll + " 份／柵欄內 " + nIn + " 份）");
+  }
 }
 
 /* ================================================================
@@ -572,8 +724,12 @@ section("73. 鑰匙圈讀外觀：快取優先、背景更新、下次冷啟動�
   }
   ok(/\.catch\(function \(\) \{/.test(SPLASHJS_C) && !/console\.(error|warn)/.test(SPLASHJS_C),
     "★ 失敗安靜吞掉，不在使用者的 console 留紅字");
-  ok((SPLASHJS.match(/applyLook/g) || []).length === 2,
+  /* applyLook 現在住在 boot：一次定義、一次呼叫，就這樣。
+     ⚠️ 判準用 `applyLook(` 不是 `applyLook` —— 匯出用的 `applyLook: applyLook` 不算呼叫。 */
+  ok((BOOTJS.match(/applyLook\(/g) || []).length === 2,
     "★ applyLook 只在開場前被呼叫一次（絕不會在讀到 keyring 之後再套一次＝中途換字）");
+  ok(!/applyLook/.test(SPLASHJS),
+    "★ splash.js 完全不碰 applyLook（讀到鑰匙圈只寫快取，下次冷啟動才生效）");
 }
 
 /* ================================================================
@@ -595,13 +751,19 @@ section("74. splash.js／splash.css 是範本的複製品，不可以在這裡�
      （手機的雲端 session 只看得到這一個 repo，所以刻意不做成 hard fail。） */
   const base = [R + "../app-template/motion/"].find(p => fs.existsSync(p + "splash.js"));
   if (base) {
+    /* ⭐ v1.5.0 起是**三個檔**要比對（splash-boot.js 是拆出來的那一支，
+       onColor 的唯一正本就住在它裡面 —— 它分岔的後果比 splash.js 更嚴重）。 */
+    ok(h(BOOTJS) === h(fs.readFileSync(base + "splash-boot.js", "utf8")),
+      "★ js/splash-boot.js 跟正本一模一樣（onColor 的唯一正本，兩邊不可以分岔）", base);
     ok(h(SPLASHJS) === h(fs.readFileSync(base + "splash.js", "utf8")),
-      "★ js/splash.js 跟正本一模一樣（onColor 兩邊不可以分岔）", base);
+      "★ js/splash.js 跟正本一模一樣", base);
     ok(h(SPLASHCSS) === h(fs.readFileSync(base + "splash.css", "utf8")),
       "★ css/splash.css 也一模一樣（落地值全部寫在 index.html 的 style 裡）", base);
   } else {
-    ok(/function onColor\(bg\)/.test(SPLASHJS) && /var ON_DARK  = "#1a1310";/.test(SPLASHJS),
-      "⚠️ 範本正本不在旁邊（../app-template/motion/），**這一輪沒有驗到「兩邊沒分岔」**；退而求其次只確認這份是完整的模組");
+    ok(/function onColor\(bg\)/.test(BOOTJS) && /var ON_DARK  = "#1a1310";/.test(BOOTJS),
+      "⚠️ 範本正本不在旁邊（../app-template/motion/），**這一輪沒有驗到「兩邊沒分岔」**；退而求其次只確認 splash-boot.js 是完整的模組");
+    ok(/window\.SplashBoot/.test(SPLASHJS),
+      "⚠️ 同上，強檢查沒有執行：只確認 splash.js 是拆檔後的那一份（吃 window.SplashBoot）");
     ok(/--splash-bg:#241f1b;/.test(SPLASHCSS),
       "⚠️ 同上，強檢查沒有執行：只確認 splash.css 仍是範本原樣（落地值在 index.html）");
   }
@@ -727,16 +889,26 @@ section("77. index.html 裡每一支本站 script 的載入形態（全掃描）
   /* 用屬性 token 判形態，不用字串包含 —— "deferred" 之類的檔名不會誤判 */
   const form = t => { const a = t.slice(7, -1).split(" ");
     return a.indexOf("defer") >= 0 ? "defer" : (a.indexOf("async") >= 0 ? "async" : "sync"); };
-  /* 豁免只有一支：js/splash.js 必須是 <head> 裡的同步腳本（理由見 §62 ——
-     它要在 body 開始解析前把外觀寫成 CSS 變數，否則會「先畫預設再中途換字」）。
+  /* 豁免只有一支（v1.5.0 第二版）：
+       ./js/splash.js —— **body 尾端**的同步腳本。它不擋第一次繪製（body 都解析完了），
+       但必須排在 app.js 之前：同步 script 一定跑在 defer 之前，改成 defer 就只剩
+       「文件順序」在保證，多一層可以被無聲改壞的東西。
+     ⚠️ splash-boot **不在這張名單上**，因為它已經不是 <script src> 了 ——
+        它 inline 在 <head> 的柵欄裡（§62b 在守）。
+        ⭐ 這裡刻意把它從豁免名單拿掉：留一個「指向不存在的檔案」的豁免，
+           等於預先幫未來的人開了一個後門（哪天有人真的加了 ./js/splash-boot.js
+           的 <script src>，這條迴圈就會安靜地放行）。豁免名單只准列真實存在的東西。
      豁免名單長度要斷言（擋人把礙事的檔案偷加進來矇混）。 */
-  const EXEMPT = ["./js/splash.js"];
-  ok(EXEMPT.length === 1, "★ 豁免名單只有 1 個（" + EXEMPT.join(",") + "）——要加請先想清楚為什麼");
+  const EXEMPT = { "./js/splash.js": "body-sync" };
+  ok(Object.keys(EXEMPT).length === 1,
+    "★ 豁免名單只有 1 個（" + Object.keys(EXEMPT).join(",") + "）——要加請先想清楚為什麼");
+  ok(tags.every(t => t.src !== "./js/splash-boot.js"),
+    "★ splash-boot 不在 <script src> 清單裡（它 inline 在柵欄；改回外部檔就等於多一個同源請求）");
   let nDefer = 0;
   for (const t of tags) {
-    if (EXEMPT.indexOf(t.src) >= 0) {
-      ok(form(t.tag) === "sync" && t.at < iHead,
-        "★ " + t.src + " 是 <head> 裡的同步腳本（豁免的那一支）", t.tag);
+    if (EXEMPT[t.src] === "body-sync") {
+      ok(form(t.tag) === "sync" && t.at > iHead,
+        "★ " + t.src + " 是 <body> 裡的同步腳本（唯一豁免：不擋第一次繪製，但要早於 app.js）", t.tag);
       continue;
     }
     ok(t.at > iHead, "★ " + t.src + " 在 </head> 之後（head 裡不留會擋解析的腳本）");
@@ -757,6 +929,184 @@ section("77. index.html 裡每一支本站 script 的載入形態（全掃描）
   /* 負控組②：屬性順序換過的標籤一樣撈得到 */
   ok(new RegExp('<script[^>]*src="([.][/]js[/][^"]+)"[^>]*>').test('<script defer src="./js/app.js"></script>'),
     "負控：屬性順序換過的標籤一樣撈得到");
+}
+
+/* ================================================================
+   §78 非阻塞 CSS ＋ 熱啟動 FOUC 閘門（v1.5.0 的第二、三件套）
+   ----------------------------------------------------------------
+   2026-08-27：Benson 錄了螢幕影片，逐格（59.94fps）拆開後量到——
+     0 – 0.50s   iOS 自己的啟動畫面（純黑）
+     0.50 – 0.73s **平滑淡出成接近全白**（中央像素 #ebebeb）
+     0.73s        我們的第一次繪製（點下圖示後約 0.87s）
+   那個白不是「瀏覽器還沒畫」的瞬間空白（那會是硬切），是 iOS 把自己的啟動畫面
+   淡出、淡進 WKWebView，而我們還沒畫出任何東西。
+   ⇒ **這是賽跑不是漸進優化**：趕在 iOS 開始淡出（約 0.5s）之前畫出第一幀，
+     白色會整個消失，不是變短。
+
+   三件套（缺一不可，各自單獨做都等於零收益）：
+     ① splash.js 拆出 splash-boot.js（§62）
+     ② 三支樣式表非阻塞（media="print" → onload 切回 all）
+     ③ html[data-cssgate] 閘門，擋住熱啟動的 FOUC
+
+   ⚠️ ② 的代價是熱啟動會露出沒套樣式的 DOM，③ 的代價是「有可能把 App 永遠藏起來」。
+      所以這一節要壓測**三種失敗路徑**：CSS 遲到／CSS 404／JS 被停用。
+      （上一輪這組守衛只有設計、沒有實測，PM 明確要求這次要有測試。）
+   ================================================================ */
+section("78a. 非阻塞 CSS 的形態（全掃描，不是列白名單）");
+{
+  /* ⚠️ 掃之前要先把 HTML 註解塗掉：註解裡寫著「<noscript> 那三行是給…」，
+     不塗的話「哪些 link 在 noscript 裡」會整組算錯（實際踩到過，
+     守衛會回報「一支樣式表都沒掃到」）。塗成等長空白，index 才不會歪。 */
+  const IDX_NC = IDX.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, " "));
+  ok(IDX_NC.length === IDX.length, "★ 尺沒壞：塗掉註解沒有改變長度（否則位置比較全錯）");
+  ok(IDX_NC !== IDX, "★ 尺沒壞：真的塗掉了至少一段註解");
+
+  const nsRanges = [...IDX_NC.matchAll(/<noscript[^>]*>[\s\S]*?<\/noscript>/g)]
+    .map(m => [m.index, m.index + m[0].length]);
+  ok(nsRanges.length === 1, "★ 有而且只有一組 <noscript>（掃到 " + nsRanges.length + " 組）");
+  const inNs = at => nsRanges.some(([a, b]) => at >= a && at < b);
+
+  const allLinks = [...IDX_NC.matchAll(/<link\b[^>]*>/g)]
+    .filter(m => /rel="stylesheet"/.test(m[0]))
+    .map(m => ({ tag: m[0], at: m.index, ns: inNs(m.index) }));
+  const live = allLinks.filter(l => !l.ns);
+  const nsLinks = allLinks.filter(l => l.ns);
+  const hrefOf = t => (/href="([^"]+)"/.exec(t) || [, "?"])[1];
+
+  ok(live.length === 3, "★ 尺沒壞：掃到 " + live.length + " 支正式的樣式表 <link>（應該是 3 支：app／motion／splash）");
+  ok(nsLinks.length === 3, "★ <noscript> 裡也有 " + nsLinks.length + " 支 fallback");
+
+  for (const l of live) {
+    const href = hrefOf(l.tag);
+    ok(/media="print"/.test(l.tag),
+      "★ " + href + " 是非阻塞的（media=\"print\"）—— 第一次繪製不必等它", l.tag);
+    ok(/\bdata-splash-css\b/.test(l.tag),
+      "★ " + href + " 有 data-splash-css（splash-boot.js 的保險絲靠這個屬性把它們掃出來）");
+    ok(/onload="this\.media='all';window\.__splashCss/.test(l.tag),
+      "★ " + href + " 的 onload 會把 media 切回 all 並回報給閘門", l.tag);
+    ok(/onerror="window\.__splashCss/.test(l.tag),
+      "★ " + href + " 有 onerror（404 也要回報，不然要等 2 秒保險絲）", l.tag);
+    ok(nsLinks.some(n => hrefOf(n.tag) === href),
+      "★ " + href + " 在 <noscript> 裡有 fallback（JS 停用時 media 永遠是 print）");
+  }
+  /* JS 停用時也沒有人會收開場 ⇒ 全螢幕的 #splash 會永遠卡住 */
+  const nsBody = nsRanges.map(([a, b]) => IDX_NC.slice(a, b)).join("\n");
+  ok(/#splash\{display:none !important;\}/.test(NOWS(nsBody).replace(/!important/, " !important")) ||
+     /#splash\s*\{[^}]*display:\s*none/.test(nsBody),
+    "★ <noscript> 裡把 #splash 關掉（JS 停用時沒有人會收開場＝App 打不開）");
+  /* 負控組：證明「是不是非阻塞」這條判準會回 false */
+  ok(!/media="print"/.test('<link rel="stylesheet" href="./css/app.css">'),
+    "負控：一支普通的阻塞式 <link> 必須被判成不合格");
+}
+
+section("78b. 閘門規則要寫在關鍵路徑塊裡（外部 CSS 全掛也要成立）");
+{
+  const CRIT = noComment(STYLE_BLOCKS[0]);
+  const C = NOWS(CRIT);
+  ok(/html\[data-cssgate\][^{]*\{[^}]*visibility:hidden/.test(C),
+    "★ 有 html[data-cssgate] … {visibility:hidden} 的閘門規則");
+  ok(C.indexOf("body>*:not(#splash)") >= 0,
+    "★ 閘門是**全掃描**（body > *:not(#splash)），不是列白名單 —— 白名單一定會漏掉新加的浮動元素");
+  ok(/html\[data-cssgate\]\{background:var\(--splash-bg,/.test(C) ||
+     /html\[data-cssgate\][^{,]*[,{][^}]*background:var\(--splash-bg,/.test(C),
+    "★ 閘門期間 <html> 的底色是 --splash-bg（深色）—— 這一段本來就是賽跑要贏的那一段，不可以自己補一塊白");
+  /* 負控組 */
+  const FAKE = "#splash{position:fixed;}html{background:var(--splash-bg,#000);}";
+  ok(!/html\[data-cssgate\][^{]*\{[^}]*visibility:hidden/.test(NOWS(FAKE)),
+    "負控：沒有閘門規則的 CSS 必須判成不合格");
+}
+
+section("78c. 失敗路徑①：CSS 遲到／onload 永遠不觸發 ⇒ 2 秒保險絲一定開閘");
+{
+  /* jsdom 不會真的去載外部 CSS，所以這裡天然就是「onload 永遠不來」的情境 */
+  const { w, d } = await boot({
+    store: ST,
+    beforeEval: withSplash(win => { win.sessionStorage.setItem("splash-seen:movie-library:1", "1"); })
+  });
+  const root = d.documentElement;
+  ok(root.getAttribute("data-splash") === "off", "（前提）這是熱啟動");
+  ok(root.hasAttribute("data-cssgate"), "★ boot 一進來就把閘門關上（CSS 還沒到，不可以露出裸 DOM）");
+  await tick(w, 500);
+  ok(root.hasAttribute("data-cssgate"), "★ 500ms 時還關著（沒有任何 link 回報過）");
+  await tick(w, 1800);
+  ok(!root.hasAttribute("data-cssgate"),
+    "★ 2 秒保險絲一到就開閘 —— 寧可 FOUC 也不可以把 App 永遠藏起來");
+  const links = [...d.querySelectorAll("link[data-splash-css]")];
+  ok(links.length === 3, "★ 尺沒壞：找得到 3 支帶 data-splash-css 的 link（實際 " + links.length + "）");
+  ok(links.every(l => l.media === "all"),
+    "★ 而且保險絲會**強制**把 media 切回 all（onload 沒觸發時，樣式仍然要套上去）："
+    + links.map(l => l.media).join("/"));
+  ok(d.querySelectorAll(".row[data-open]").length === 6, "★ App 本身完全正常（片單出得來）");
+  ok(/CSS_FUSE = 2000/.test(BOOTJS), "★ 保險絲時間是寫死的 2000ms（不是靠某個事件）");
+}
+
+section("78d. 失敗路徑②：CSS 404 ⇒ onerror 回報，立刻開閘不必等保險絲");
+{
+  const { w, d } = await boot({
+    store: ST,
+    beforeEval: withSplash(win => { win.sessionStorage.setItem("splash-seen:movie-library:1", "1"); })
+  });
+  const root = d.documentElement;
+  ok(root.hasAttribute("data-cssgate"), "（前提）閘門是關著的");
+  const links = [...d.querySelectorAll("link[data-splash-css]")];
+  ok(typeof w.__splashCss === "function", "★ boot 有把 __splashCss() 掛在 window 上（行內屬性只看得到全域）");
+  /* 模擬三支全部 404：瀏覽器會逐一觸發 onerror → 行內屬性呼叫 __splashCss(this) */
+  links.forEach((l, i) => {
+    w.__splashCss(l);
+    if (i < links.length - 1) {
+      ok(root.hasAttribute("data-cssgate"),
+        "★ 只回報了 " + (i + 1) + "/3 支，閘門還不能開（開早了就是 FOUC）");
+    }
+  });
+  ok(!root.hasAttribute("data-cssgate"), "★ 三支都回報之後立刻開閘（沒有等那 2 秒）");
+  ok(d.querySelectorAll(".row[data-open]").length === 6, "★ CSS 全 404，App 照樣完整可用");
+  /* 這一條是「404 不可以變成永遠看不見」的核心：#splash 的關鍵路徑規則仍在 inline <style> 裡，
+     所以第一次繪製仍然是深色（§75 已經逐條驗過）。 */
+  ok(/color:var\(--splash-on-accent\)/.test(noComment(STYLE_BLOCKS[0])),
+    "★ 而且第一幀的長相仍然完全來自 inline 的關鍵路徑 CSS（不依賴那三支）");
+}
+
+section("78e. 失敗路徑③：JS 被停用／splash-boot.js 沒載到 ⇒ 閘門根本不存在");
+{
+  /* harness 的預設狀態＝所有 <script src> 都被拿掉，等於「JS 停用」的效果：
+     沒有人會去掛 data-cssgate ⇒ 選擇器永遠不匹配 ⇒ 畫面照常顯示。
+     ⭐ 這是刻意的設計：守衛要寫成「有人負責開，才准關」。 */
+  const { w, d } = await boot({ store: ST });
+  await tick(w, 250);
+  ok(!d.documentElement.hasAttribute("data-cssgate"),
+    "★ 沒有 boot ⇒ html 上根本沒有 data-cssgate（閘門關不起來，不可能把 App 藏死）");
+  ok(!w.SplashBoot, "（前提）確認 splash-boot.js 真的沒有跑");
+  ok(d.querySelectorAll(".row[data-open]").length === 6, "★ App 完整可用");
+  /* 原始碼層：閘門只由 boot 掛上，沒有第二個地方會設它 */
+  const gateSetters = (BOOTJS.match(/setAttribute\("data-cssgate"/g) || []).length;
+  ok(gateSetters === 1, "★ 全專案只有 splash-boot.js 一個地方會關閘門（實際 " + gateSetters + " 處）");
+  ok(!/data-cssgate/.test(SPLASHJS.replace(/removeAttribute\("data-cssgate"\)/g, "")),
+    "★ splash.js 只會**開**閘門、不會關（沒有 boot 時它是收拾殘局的那一方）");
+  ok(!/setAttribute\("data-cssgate"/.test(APPJS), "★ app.js 也不會去關閘門");
+}
+
+section("78f. 交棒保險絲：連 js/splash.js 都沒載到，開場也一定會消失");
+{
+  /* 只跑 boot、不跑 splash.js ＝ 部署漏檔／SW 殼快取沒建完。
+     再假裝 app 以為模組在（window.Splash 有東西），把 app.js 的 fallback 擋掉，
+     這樣就只剩 boot 自己的交棒保險絲能救 —— 那正是這一條要驗的。
+     ⭐ 舊版的保險絲住在 splash.js 自己裡面（＝那支檔案沒到就沒有保險絲）。 */
+  const { w, d } = await boot({
+    store: ST,
+    beforeEval: withBootOnly(win => { win.Splash = { hold() { }, ready() { } }; })
+  });
+  ok(!!w.SplashBoot, "（前提）boot 有跑");
+  ok(w.__splashTakeover !== true, "（前提）沒有人接手（splash.js 沒載到）");
+  ok(!!d.getElementById("splash"), "開場在畫面上，而且沒有人會來收它");
+  await tick(w, 1000);
+  ok(!!d.getElementById("splash"), "★ 1 秒時還在（保險絲不是提早出手）");
+  await tick(w, 6400);
+  ok(!d.getElementById("splash"), "★ 7 秒交棒保險絲一到就把開場從 DOM 拿掉");
+  ok(d.documentElement.getAttribute("data-splash") === "off", "★ 而且 data-splash=off 也補上了");
+  ok(!d.documentElement.hasAttribute("data-cssgate"), "★ 順手把閘門也開掉（不然畫面還是空的）");
+  ok(/TAKEOVER_FUSE = 7000/.test(BOOTJS), "★ 保險絲時間寫死在 boot 裡（不住在那支可能沒載到的檔案）");
+  ok(/W\.__splashTakeover/.test(BOOTJS) && /W\.__splashTakeover = true;/.test(SPLASHJS),
+    "★ 交棒旗標兩邊對得上（splash.js 一載入就宣告接手）");
 }
 
 process.exit(summary() ? 1 : 0);

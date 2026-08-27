@@ -6,7 +6,15 @@
    --cold=1 ⭐ 每一次取樣前都把該來源的 cache / SW / storage 清乾淨
             （＝Benson 用 Safari 第一次開那個網址、或剛清過資料的情境）
             會多印兩欄自證：SW? 這一次的文件是不是 SW 給的、下載KB 實際下載量。
-            冷啟動時 SW? 必須是 no、下載KB 必須 > 0，否則就是尺壞了。 */
+            冷啟動時 SW? 必須是 no、下載KB 必須 > 0，否則就是尺壞了。
+
+   --block=1 ⭐⭐ 擋掉所有外部主機（TMDB／海報／鑰匙圈）。
+            **量冷啟動幾乎一定要開這個。** 2026-08-27 實測：不擋的話，App 開起來之後
+            會去打 keyring.json（~580ms）＋ TMDB 兩支 API（~1300ms）＋ 15 張海報，
+            那些是**真的網際網路請求**，會跟下一輪取樣搶被節流的那條頻寬
+            ⇒ 同一個版本的中位數在 202ms 與 682ms 之間跳，看起來像「新版慢了三倍」。
+            症狀是**雙峰分布**（min 116ms 但中位 592ms）：看到這個先懷疑鷹架，不要改程式。
+            ⚠️ 擋掉之後量到的是「第一次繪製」，不是「資料多久出得來」——這兩件事本來就該分開量。 */
 import { spawn } from "node:child_process";
 import fs from "node:fs"; import path from "node:path"; import os from "node:os";
 import { CDP } from "./cdp.mjs";
@@ -19,6 +27,11 @@ const A = Object.fromEntries(argv.slice(0, cut).map(s => { const [k, v] = s.repl
 const TARGETS = argv.slice(cut + 1).map(s => { const [p, n] = s.split(":"); return { p, n, url: `http://127.0.0.1:${p}/index.html` }; });
 const REPS = Number(A.reps || 15), CPU = Number(A.cpu || 1), NET = A.net || "none";
 const COLD = A.cold === "1" || A.cold === true;
+const BLOCK = A.block === "1" || A.block === true;
+/* 外部主機黑名單：這幾個是 App 開起來之後才打的，跟「第一次繪製」無關，
+   但它們是真的網際網路請求，會污染被節流的頻寬（見檔頭 --block 的說明）。 */
+const BLOCKED = ["*themoviedb.org*", "*omdbapi.com*", "*tmdb.org*",
+                 "*githubusercontent.com*", "*github.io*"];
 const SW = !COLD && A.sw !== "0";
 const DEV = Number(A.dev || 9800);
 const WAIT = Number(A.wait || 7000);
@@ -59,6 +72,7 @@ async function measure(url) {
   await c.send("Page.setLifecycleEventsEnabled", { enabled: true });
   await c.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   if (COLD) await wipe(c, origin);
+  if (BLOCK) { try { await c.send("Network.setBlockedURLs", { urls: BLOCKED }); } catch (e) {} }
   await c.send("Emulation.setCPUThrottlingRate", { rate: CPU });
   if (NETS[NET]) await c.send("Network.emulateNetworkConditions", { offline: false, ...NETS[NET] });
   await c.send("Page.addScriptToEvaluateOnNewDocument", {
@@ -106,7 +120,7 @@ const q = (v, p) => v.length ? v[Math.min(v.length - 1, Math.floor(v.length * p)
   if (SW) for (const t of TARGETS) { const tab = await newTab(); await tab.cdp.send("Page.enable"); await tab.cdp.send("Page.navigate", { url: t.url }); await sleep(3000); await closeTab(tab); }
   const acc = new Map(TARGETS.map(t => [t.n, []]));
   for (let r = 0; r < REPS; r++) { const order=[...TARGETS].sort(()=>Math.random()-0.5); for (const t of order) acc.get(t.n).push(await measure(t.url)); }
-  console.log(`情境 reps=${REPS} cpu=x${CPU} net=${NET} ${COLD ? "cold=全清(冷啟動)" : (SW ? "sw=走SW(熱啟動)" : "sw=不預裝")}`);
+  console.log(`情境 reps=${REPS} cpu=x${CPU} net=${NET} ${COLD ? "cold=全清(冷啟動)" : (SW ? "sw=走SW(熱啟動)" : "sw=不預裝")} ${BLOCK ? "block=擋掉外部主機" : "block=off(外部請求會污染頻寬)"}`);
   console.log("目標".padEnd(18) + " | FP min |  p25  |  中位 |  p75  | 首幀色    | 首幀ms | 開場停留 | SW? | 下載KB");
   for (const [n, rows] of acc) {
     const fp = rows.map(x => x.fp).filter(x => x != null).sort((a, b) => a - b);

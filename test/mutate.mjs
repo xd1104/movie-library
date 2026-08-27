@@ -223,9 +223,10 @@ const M = [
   ["X06 splash.js 沒進 sw.js 殼快取（離線就沒有開場）", "sw.js", `  "./js/splash.js",\n`, ``],
   ["X07 範本的色票被抄進 motion.css（--bg 撞名，會蓋掉整套配色）", "css/motion.css", `  --stagger:45ms;`, `  --bg:#171513;\n  --stagger:45ms;`],
   ["X08 開場底色跟 manifest 不一致（iPhone 會白閃一下）", "index.html", `    --splash-bg:#0b0d12;`, `    --splash-bg:#0c0d12;`],
-  ["X09 符號字色寫死白字（不再由 onColor 算，白底就看不見）", "js/splash.js", `      setVar("--splash-on-accent", onColor(look.accent));`, `      setVar("--splash-on-accent", "#ffffff");`],
-  ["X10 熱啟動也重播開場（切分頁回來又演一次）", "js/splash.js", `      if (W.sessionStorage.getItem(SEEN_KEY)) return false;`, `      if (false) return false;`],
-  ["X11 讀到鑰匙圈就中途換字（名字會跳動）", "js/splash.js", `    writeCache(look);`, `    writeCache(look); applyLook(look);`],
+  /* ⚠️ v1.5.0 拆檔：X09／X10 的目標搬到 js/splash-boot.js（第一幀那一段的新家） */
+  ["X09 符號字色寫死白字（不再由 onColor 算，白底就看不見）", "js/splash-boot.js", `      setVar("--splash-on-accent", onColor(look.accent));`, `      setVar("--splash-on-accent", "#ffffff");`],
+  ["X10 熱啟動也重播開場（切分頁回來又演一次）", "js/splash-boot.js", `      if (W.sessionStorage.getItem(SEEN_KEY)) return false;`, `      if (false) return false;`],
+  ["X11 讀到鑰匙圈就中途換字（名字會跳動）", "js/splash.js", `    B.writeCache(look);`, `    B.writeCache(look); B.applyLook(look);`],
   ["X12 分頁少了按下回饋（全掃描要抓得到漏掉的那一顆）", "css/motion.css", `.tab:active,\n`, ``],
   ["X13 返回沒有方向感（首頁不播 pop）", "js/app.js", `    if (was === "detail" || was === "setup") {
       var vh = $("view-home");
@@ -238,12 +239,12 @@ const M = [
   ["X15 splash.js 加了 defer（會先畫預設值再跳成新名字）", "index.html", `<script src="./js/splash.js"></script>`, `<script defer src="./js/splash.js"></script>`],
   /* ---- v1.4.1 白閃修正：第一次繪製必定是深色（t14 §75 在守） ---- */
   ["X16 拿掉關鍵路徑的 html 底色（CSS 沒到位時第一次繪製會是純白）", "index.html",
-    `  html:not([data-splash="off"]){background:var(--splash-bg,#0b0d12);}\n`, ``],
+    `  html:not([data-splash="off"]),\n  html[data-cssgate]{background:var(--splash-bg,#0b0d12);}\n`, ``],
   ["X17 關鍵路徑的 #splash 不再蓋滿（會透出沒套樣式的 app 內容）", "index.html",
     `    position:fixed; inset:0; z-index:200; overflow:hidden;`, `    overflow:hidden;`],
   ["X18 關鍵路徑的後備底色跟 manifest 不一致（白閃換成色差）", "index.html",
-    `  html:not([data-splash="off"]){background:var(--splash-bg,#0b0d12);}`,
-    `  html:not([data-splash="off"]){background:var(--splash-bg,#0c0d12);}`],
+    `  html[data-cssgate]{background:var(--splash-bg,#0b0d12);}`,
+    `  html[data-cssgate]{background:var(--splash-bg,#0c0d12);}`],
   ["X19 開場最短顯示調回 650（動作剛做完就走，沒有那一拍定格）", "js/splash.js",
     `  var MIN_SHOW = REDUCE ? 300 : 950;`, `  var MIN_SHOW = REDUCE ? 300 : 650;`],
   ["X20 關鍵路徑把符號字色寫死（不再跟著 onColor，鑰匙圈換色就分岔）", "index.html",
@@ -253,6 +254,53 @@ const M = [
     `<script defer src="./js/app.js"></script>`, `<script src="./js/app.js"></script>`],
   ["X22 鑰匙圈拿掉 defer（載入形態跟 config.js 不一致 ⇒ 執行順序會反過來）", "index.html",
     `<script defer src="./js/keyring-unlock.js"></script>`, `<script src="./js/keyring-unlock.js"></script>`],
+  /* ---- v1.5.0 賽跑三件套（t14 §62／§78 在守）：
+         ① splash-boot.js 拆檔 ② CSS 非阻塞 ③ data-cssgate 閘門
+  /* ---- v1.5.0 第二版：boot 從外部檔改成 inline 在柵欄裡（同源請求 2 → 1，t14 §62b 在守） ---- */
+  ["X23 有人手改 index.html 裡的 inline boot（跟正本分岔，只有 SHA 守衛抓得到）", "index.html",
+    `  var TAKEOVER_FUSE = 7000;`, `  var TAKEOVER_FUSE = 7001;`],
+  ["X24 boot 又變回外部 <script src>（第一次繪製之前又多一個同源請求）", "index.html",
+    `<!-- SPLASH-BOOT-INLINE:BEGIN`, `<script src="./js/splash-boot.js"></script>\r\n<!-- SPLASH-BOOT-INLINE:BEGIN`],
+  ["X34 有人只改了正本、忘了重貼 inline（改的是註解，行為完全沒變）", "js/splash-boot.js",
+    `     ① 讀 localStorage 的外觀快取（名字／符號／顏色）`,
+    `     ① 讀 localStorage 的外觀快取（名字/符號/顏色）`],
+  ["X35 樣式表變回 render-blocking（第一次繪製又要等 CSS）", "index.html",
+    `<link rel="stylesheet" href="./css/splash.css" media="print" data-splash-css`,
+    `<link rel="stylesheet" href="./css/splash.css" data-splash-css`],
+  ["X25 拿掉熱啟動的 FOUC 閘門（CSS 非阻塞之後會露出裸 DOM）", "index.html",
+    `  html[data-cssgate] body > *:not(#splash){visibility:hidden;}\n`, ``],
+  ["X26 閘門改成列白名單（新加的浮動元素就漏掉了）", "index.html",
+    `  html[data-cssgate] body > *:not(#splash){visibility:hidden;}`,
+    `  html[data-cssgate] #app{visibility:hidden;}`],
+  ["X27 拿掉閘門的 2 秒保險絲（CSS 永遠不回報就把 App 藏死）", "js/splash-boot.js",
+    `  W.setTimeout(openGate, CSS_FUSE);`, ``],
+  ["X28 hardRemove 又順手開閘門（熱啟動的 FOUC 整個回來）", "js/splash-boot.js",
+    `      root.setAttribute("data-splash", "off");
+    } catch (e) {}
+  }
+  W.setTimeout(function () {`,
+    `      root.setAttribute("data-splash", "off");
+    } catch (e) {}
+    openGate();
+  }
+  W.setTimeout(function () {`],
+  ["X29 樣式表變回 render-blocking（第一次繪製又要等三支 CSS）", "index.html",
+    `<link rel="stylesheet" href="./css/app.css" media="print" data-splash-css`,
+    `<link rel="stylesheet" href="./css/app.css" data-splash-css`],
+  ["X30 拿掉一支 <noscript> fallback（JS 停用時整頁沒樣式）", "index.html",
+    `  <link rel="stylesheet" href="./css/app.css">\n`, ``],
+  ["X31 <noscript> 不再關掉開場（JS 停用時全螢幕開場永遠卡住）", "index.html",
+    `  <style>#splash{display:none !important;}</style>\n`, ``],
+  ["X32 拿掉交棒保險絲（splash.js 沒載到就沒有人收開場）", "js/splash-boot.js",
+    `  W.setTimeout(function () {
+    if (W.__splashTakeover) { return; }   /* splash.js 有接手，交給它 */
+    hardRemove();
+    /* 沒有人接手＝這一頁大概也出了別的事，閘門一起開掉，不要留一片空白 */
+    openGate();
+  }, TAKEOVER_FUSE);\n`, ``],
+  ["X33 splash.js 又自己寫一份 onColor（換色時兩份會分岔）", "js/splash.js",
+    `  W.__splashTakeover = true;`,
+    `  W.__splashTakeover = true;\n  function onColor(bg){ return "#ffffff"; }`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

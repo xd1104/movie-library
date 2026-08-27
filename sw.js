@@ -1,4 +1,4 @@
-/* build 1.4.2 */
+/* build 1.5.0 */
 /* ⚠️ 上面那行 build 版本字串要跟 js/config.js 的 HLM_VER 一起 +1。
    兩個地方都要改是刻意的：瀏覽器判斷「SW 有沒有更新」是比對 sw.js 本身的位元組，
    只改 importScripts 進來的 config.js 有機會不觸發更新，那個症狀是「老闆永遠拿不到新版」。 */
@@ -26,6 +26,11 @@ var FILES = [
      少一個就紅——不是列白名單。 */
   "./css/motion.css",
   "./css/splash.css",
+  /* ⚠️ js/splash-boot.js **刻意不在這裡**：v1.5.0 起它是 inline 在 index.html 的柵欄裡
+     （第一次繪製之前的同源請求數 2 → 1），已經不會被 <script src> 載入 ⇒ 預快取它等於快取一個
+     沒有人會去要的檔案。它仍然留在 repo 裡，因為它是 inline 副本的正本來源與 t14 §74 的比對對象。
+     ⚠️ 哪天有人把它改回 <script src>，t14 §63（全掃 index.html 引用到的每一個本站 css/js）
+     會立刻要求把它加回這份清單。 */
   "./js/splash.js",
   "./js/keyring-unlock.js",
   "./js/config.js",

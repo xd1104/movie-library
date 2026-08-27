@@ -6,7 +6,9 @@
     "test": "node test/run.mjs",
     "test:mutate": "node test/mutate.mjs",
     "icons": "node scripts/gen-icons.mjs",
-    "serve": "python3 -m http.server 8080"
+    "serve": "python3 -m http.server 8080",
+    "inline-boot": "node scripts/inline-boot.js index.html js/splash-boot.js",
+    "inline-boot:check": "node scripts/inline-boot.js --check index.html js/splash-boot.js"
   },
   "devDependencies": {
     "jsdom": "^28.0.0"
