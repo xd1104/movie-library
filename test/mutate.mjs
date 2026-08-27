@@ -294,7 +294,7 @@ const M = [
   ["X30 拿掉一支 <noscript> fallback（JS 停用時整頁沒樣式）", "index.html",
     `  <link rel="stylesheet" href="./css/app.css">\n`, ``],
   ["X31 <noscript> 不再關掉開場（JS 停用時全螢幕開場永遠卡住）", "index.html",
-    `  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;}</style>\n`, ``],
+    `  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;} body{background:var(--bg) !important;}</style>\n`, ``],
   ["X32 拿掉交棒保險絲（splash.js 沒載到就沒有人收開場）", "js/splash-boot.js",
     `  W.setTimeout(function () {
     if (W.__splashTakeover) { return; }   /* splash.js 有接手，交給它 */
@@ -376,8 +376,8 @@ const M = [
   ["X56 拿掉「開場播放中不畫 App」的遮罩（畫面沒被 #splash 蓋到的地方會露出 App 內容）", "index.html",
     `  html:not([data-splash="off"]) #splash:not(.out) ~ *{visibility:hidden;}\n`, ``],
   ["X57 <noscript> 沒有把遮罩解除（JS 停用時整個 App 被藏死）", "index.html",
-    `  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;}</style>`,
-    `  <style>#splash{display:none !important;}</style>`],
+    `  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;} body{background:var(--bg) !important;}</style>`,
+    `  <style>#splash{display:none !important;} body{background:var(--bg) !important;}</style>`],
   ["X58 遮罩漏了 :not([data-splash=\"off\"])（熱啟動也會被藏起來）", "index.html",
     `html:not([data-splash="off"]) #splash:not(.out) ~ *`, `html #splash:not(.out) ~ *`],
   ["X59 遮罩漏了 :not(.out)（收場淡出時 App 還是黑的，交叉淡入變成硬切）", "index.html",
@@ -402,6 +402,28 @@ const M = [
   ["X64 CSS 加了那一拍、MIN_SHOW 忘了跟上（名字演不完就被收掉）", "js/splash.js",
     `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1490 : 950);`,
     `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1150 : 950);`],
+  /* ⭐⭐ v1.6.3「開場播放中不可以有第二個沒在沉的深色底」（§75f）。
+     X65～X67 打「body 讓開」那一條（兩份實作各一條 ＋ 一條「寫得不對」的版本）；
+     X68～X70 打 theme-color 追蹤器與 <noscript> 的配套。
+     ⚠️ X65／X67 動的是 css/splash.css、X68／X69 動的是 js/splash-boot.js
+        ⇒ §74（跟範本比 SHA）與 §62b（inline 副本比 SHA）一定會跟著紅，
+        那是結構性限制（見 X52／X53 的註解）。要單獨證明 §75f 承重，
+        請用「正本與副本同時改」的配對突變（v1.6.3 已實測，結果記在 CLAUDE.md 第 37 條）。 */
+  ["X65 body 讓開那一條從 css/splash.css 被拿掉（沒被 #splash 蓋到的地方又變回 #0b0d12）", "css/splash.css",
+    `html[data-splash-intro="light"]:not([data-splash="off"]) body{ background:transparent; }`,
+    `html[data-splash-intro="light"]:not([data-splash="off"]) body{ }`],
+  ["X66 關鍵路徑塊少了同一條（app.css 先到、splash.css 後到的那個窗口沒人守）", "index.html",
+    `  html[data-splash-intro="light"]:not([data-splash="off"]) body{background:transparent;}\n`, ``],
+  ["X67 body 沒有讓開，改成自己再跑一條漸深（同一條時間線活在兩個地方）", "css/splash.css",
+    `html[data-splash-intro="light"]:not([data-splash="off"]) body{ background:transparent; }`,
+    `html[data-splash-intro="light"]:not([data-splash="off"]) body{ background:var(--sp-start); animation:sp-sink-bg var(--sp-sink) linear var(--sp-lead) forwards; }`],
+  ["X68 theme-color 追蹤器沒有啟動（開場是淺的，theme-color 還說自己是深的）", "js/splash-boot.js",
+    `  if (COLD) {\n    try { TC_META = D.querySelector('meta[name="theme-color"]'); } catch (e) { TC_META = null; }`,
+    `  if (false) {\n    try { TC_META = D.querySelector('meta[name="theme-color"]'); } catch (e) { TC_META = null; }`],
+  ["X69 收場忘了寫回原本的字面值（theme-color 停在一個沒人設定過的 rgb(...)）", "js/splash-boot.js",
+    `      TC_NOW = null;   /* 強制寫回原字面值，不要因為「顏色一樣」而留下 rgb(...) */\n`, ``],
+  ["X70 <noscript> 沒把 body 底色釘回 --bg（JS 停用時畫面會有一秒是淺色的）", "index.html",
+    ` body{background:var(--bg) !important;}</style>`, `</style>`],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

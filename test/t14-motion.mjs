@@ -1572,6 +1572,157 @@ section("75d. CSS 全 404 的新期望值：底色是我們決定的、保險絲
 }
 
 /* ================================================================
+   §75f ⭐⭐ 開場播放中，畫面上不可以有第二個「沒在沉」的深色底（v1.6.3，2026-08-28）
+   ----------------------------------------------------------------
+   Benson 第四次回報，這次症狀很具體（兩次開啟、位置完全一樣：畫格 76–77 與 328–329）：
+   **畫面下緣一條約 58 CSS px 的純色深色**，而**同一格的上半部仍然在正常變亮**。
+
+     畫格 75   上半 #c9ccc9   最下緣 #c9ccc9（一致）
+     畫格 76   上半 #cfd2ce   最下緣 **#0a0e11**
+     畫格 77   上半 #d3d6d3   最下緣 **#0a0e11**
+     畫格 78   上半 #d8dbd8   最下緣 #d8dbd8（恢復）
+
+   `#0a0e11` 在影片壓縮誤差內就是 **#0b0d12** —— 而 `--bg`／`manifest.background_color`／
+   `<meta theme-color>` **三個值剛好一模一樣**，所以錄影本身**分不出來是誰畫的**。
+   附帶事實：那兩格 iOS 的 home 指示條從灰翻白 ⇒ iOS 認定那塊區域是深色的。
+
+   ⚠️ v1.6.1 的「開場播放中不畫 App」修的是**別的東西**：那條藏的是 body 的**子元素**，
+      而這條帶是**純色、沒有紋理**（App 內容是有紋理的電影卡片）⇒ 它不是 App 內容，
+      `visibility:hidden` 從來就蓋不到它。所以那一版沒有把它修掉。
+
+   兩個都說得通、而且**本機都複現不出「為什麼會露出來」**的成因：
+     ① 頁面自己有一塊沒被 #splash 蓋到 ⇒ 露出 **body 自己的底色**（css/splash.css §7a2）。
+        本機真 Chrome（393x852、開場中取樣）實測：
+          getComputedStyle(html).backgroundColor = rgb(195,195,196)（正在沉）
+          getComputedStyle(body).backgroundColor = **rgb(11,13,18)**
+        把 #splash 的高度改短 59px，露出來那一條量到的就是 **#0b0d12**
+        ⇒ **同一把槍確實在房間裡**（修完之後同一個實驗量到的是 #a6a7a8 ＝ 當下的漸深色）。
+     ② iOS 拿 `<meta theme-color>` 去畫「頁面之外」那一圈（js/splash-boot.js §7b）。
+   ⇒ **兩邊都修，不挑一個信。** manifest.background_color **不准動**
+     （那是 C1，代價是他要把 App 從主畫面移除重加 —— 他明確選了不用重加的版本，§60 有反向斷言在守）。
+
+   ⚠️⚠️ 這一節守的全部是**可機器驗的性質**（規則在不在、theme-color 有沒有跟著走、
+        收場有沒有換回來）。**那條深色帶在真機上有沒有消失，只有 Benson 的螢幕錄影說得準**
+        —— 這台機器沒有 safe-area、沒有 home 指示條，那個窗口複現不出來。
+   ================================================================ */
+section("75f. 開場播放中不可以有第二個深色底：body 讓開 ＋ theme-color 跟著走");
+{
+  /* ---------- ① CSS：body 讓開，而且**兩份實作都要有** ---------- */
+  const SC = NOWS(noComment(SPLASHCSS));
+  const CRIT_F = NOWS(noComment(STYLE_BLOCKS[0]));
+  const RE_BODY = /html\[data-splash-intro="light"\]:not\(\[data-splash="off"\]\)body\{background:transparent;?\}/;
+
+  ok(RE_BODY.test(SC),
+    "★★ css/splash.css §7a2 有「開場播放中 body 底色讓開」那一條"
+    + "（body 的方框畫在 html 畫布**上面**，§7a 讓 html 沉了它照樣是深的）");
+  ok(RE_BODY.test(CRIT_F),
+    "★★ 關鍵路徑塊**也**有同一條 —— 三支 CSS 是非阻塞的，app.css 有可能先到、splash.css 後到，"
+    + "中間那個窗口 body 就是深色的，而那正是錄影拍到的那一刻");
+  ok(!/:not\(\[data-splash="off"\]\)body\{[^}]*animation:/.test(SC),
+    "★ body **不可以**自己再跑一條漸深（同一條時間線活在兩個地方，改 token 時必分岔）"
+    + "；讓開之後畫布就只剩 §7a 那一條，任何一個瞬間都不可能對不上");
+  {
+    const nsBlock = (/<noscript[^>]*>([\s\S]*?)<\/noscript>/.exec(IDX) || [, ""])[1];
+    ok(/body\{background:var\(--bg\)!important;?\}/.test(NOWS(nsBlock)),
+      "★ <noscript> 把 body 底色釘回 --bg —— JS 停用時 <html> 上沒有 data-splash ⇒ 上面那條會匹配，"
+      + "畫面會有一秒鐘是淺色的");
+  }
+  /* 負控組：三把尺各驗一次會不會回 false／true */
+  ok(!RE_BODY.test(NOWS('html[data-splash-intro="light"]:not([data-splash="off"]){background:var(--sp-start);}')),
+    "負控：只有 <html> 那一條**不算數**（那正是 v1.6.2 的狀態，而錄影拍到的就是它蓋不到的地方）");
+  ok(!RE_BODY.test(NOWS("body{background:transparent;}")),
+    "負控：沒有前綴的 body{background:transparent} 不算數（那會讓熱啟動與收場之後也透明）");
+  ok(RE_BODY.test(NOWS('html[data-splash-intro="light"]:not([data-splash="off"]) body{background:transparent;}')),
+    "負控：正確的寫法必須算數（證明這把尺不是恆 false ＝ 恆紅）");
+
+  /* ---------- ② theme-color 跟著開場的底色走（真的跑一次 boot） ----------
+     jsdom 不跑 CSS 動畫 ⇒ 把「畫面當下的底色」換成**受控的假值**，
+     驗的是追蹤器的行為（讀什麼、寫什麼、什麼時候換回來），不是 CSS 的漸變曲線。 */
+  const META_SEL = 'meta[name="theme-color"]';
+  const themeOf = d => d.querySelector(META_SEL).getAttribute("content");
+  /* 只替換 <html> 的 computed backgroundColor，其餘一律轉給 jsdom 原本的實作 */
+  function withBg(box, extra) {
+    return function (w) {
+      const orig = w.getComputedStyle.bind(w);
+      w.getComputedStyle = function (el, ps) {
+        if (el === w.document.documentElement && !ps) { return { backgroundColor: box.bg }; }
+        return orig(el, ps);
+      };
+      if (extra) extra(w);
+    };
+  }
+
+  ok(/<meta name="theme-color" content="#0b0d12">/.test(IDX),
+    "負控（也是契約）：index.html 裡**靜態**的 theme-color 仍然是 #0b0d12 ⇒ "
+    + "下面量到的淺色一定是追蹤器寫進去的，不是原本就淺的");
+  ok(/getComputedStyle\(root\)\.backgroundColor/.test(BOOTJS_C),
+    "★ 追蹤器讀的是「畫面當下的 computed 底色」，不是自己再算一次漸變"
+    + "（顏色的真相來源只有 css/splash.css §7a 那一條）");
+  ok(!/--sp-sink|--sp-lead|--sp-start/.test(BOOTJS_C),
+    "★ 所以 boot 不需要知道任何時長或起點色 —— 換 token／換變體／reduce／CSS 沒載到全部自動正確");
+
+  /* ②a 冷啟動：第一時間就換成淺色，之後每一幀跟著走，收場逐字換回來 */
+  {
+    const box = { bg: "rgb(235, 235, 235)" };
+    const { w, d } = await boot({ store: ST, beforeEval: withSplash(withBg(box)) });
+    ok(themeOf(d) === "rgb(235, 235, 235)",
+      "★★ 冷啟動：theme-color 第一時間就換成畫面當下的底色（實際 " + themeOf(d) + "）");
+    ok(themeOf(d) !== "#0b0d12",
+      "★★ 而且**不是** #0b0d12 —— 開場是淺的，theme-color 不可以還跟系統說「我是深色的」");
+    box.bg = "rgb(120, 120, 120)";
+    await tick(w, 140);
+    ok(themeOf(d) === "rgb(120, 120, 120)",
+      "★ 底色沉到一半，theme-color 跟著走（實際 " + themeOf(d) + "）—— 這也是狀態列文字不會看不見的理由："
+      + "它拿到的永遠是畫面**當下**的真實底色，不會出現「說淺、畫面已經深」的窗口");
+    box.bg = "rgb(11, 13, 18)";
+    await tick(w, 140);
+    ok(themeOf(d) === "rgb(11, 13, 18)", "★ 沉到終點也跟著（實際 " + themeOf(d) + "）");
+    await tick(w, 3400);
+    ok(!d.getElementById("splash"), "（前提）開場已經收掉了");
+    ok(themeOf(d) === "#0b0d12",
+      "★★ 收場之後**逐字**還原成原本的 #0b0d12（不是等價的 rgb(11, 13, 18)）"
+      + " —— App 跑起來之後 theme-color 不可以是一個沒人設定過的字串");
+  }
+  /* ②b 底色本來就等於 theme-color（印記變體／reduce）：一個位元組都不寫 */
+  {
+    const box = { bg: "rgb(11, 13, 18)" };
+    const { w, d } = await boot({ store: ST, beforeEval: withSplash(withBg(box)) });
+    ok(themeOf(d) === "#0b0d12",
+      "★ 畫面底色本來就等於 theme-color 時（印記變體、reduce）**一個位元組都不寫**："
+      + "留著原本的 #0b0d12，不會被改寫成等價的 rgb(...)");
+    await tick(w, 200);
+    ok(themeOf(d) === "#0b0d12", "★ 跑了幾十幀也一樣 ⇒ 這一段對預設變體是隱形的");
+  }
+  /* ②c 熱啟動：追蹤器根本不啟動 */
+  {
+    const box = { bg: "rgb(235, 235, 235)" };
+    const { w, d } = await boot({
+      store: ST,
+      beforeEval: withSplash(withBg(box, win => { win.sessionStorage.setItem("splash-seen:movie-library:1", "1"); }))
+    });
+    ok(d.documentElement.getAttribute("data-splash") === "off", "（前提）這是熱啟動");
+    ok(themeOf(d) === "#0b0d12",
+      "★ 熱啟動：theme-color 從頭到尾沒被碰過（不播開場，本來就該是 App 自己的深色）");
+    await tick(w, 200);
+    ok(themeOf(d) === "#0b0d12", "★ 之後也沒有（追蹤器只在冷啟動啟動）");
+  }
+  /* ②d 降級路徑：連 js/splash.js 都沒載到，也一定換得回來（保險絲在 boot 裡） */
+  {
+    const box = { bg: "rgb(235, 235, 235)" };
+    const { w, d } = await boot({
+      store: ST,
+      beforeEval: withBootOnly(withBg(box, win => { win.Splash = { hold() { }, ready() { } }; }))
+    });
+    ok(themeOf(d) === "rgb(235, 235, 235)", "（前提）splash.js 沒載到，開場還在、theme-color 是淺的");
+    await tick(w, 7400);
+    ok(!d.getElementById("splash"), "（前提）交棒保險絲把開場收掉了");
+    ok(themeOf(d) === "#0b0d12",
+      "★★ 連 splash.js 都沒載到，theme-color 也一定換得回來 —— 還原的責任在 boot，"
+      + "不在那支可能沒到的檔案裡（跟交棒保險絲同一個理由）");
+  }
+}
+
+/* ================================================================
    §77 第一次繪製的關鍵路徑上，只准站著「第一次繪製真的需要的東西」
    ----------------------------------------------------------------
    2026-08-26 用本機真 Chrome（--headless=new ＋ CDP 逐幀取樣、

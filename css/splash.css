@@ -325,6 +325,35 @@ html[data-splash-intro="light"]:not([data-splash="off"]){
   to  {background-color:var(--splash-bg);}
 }
 
+/* 7a2. ⭐⭐ 開場播放中，**<body> 自己的底色必須讓開**（v1.6.3，2026-08-28）。
+   ------------------------------------------------------------
+   §7a 讓 <html> 的畫布跟著沉了，但畫面上還有**第二個底色**：
+   app 自己的 `body{background:var(--bg)}`。body 的方框畫在 html 的畫布**上面**，
+   所以只要有一塊畫面沒被 #splash 蓋到，使用者看到的不是 §7a 那個正在沉的顏色，
+   是 body 那一片**從頭到尾沒有動過的深色**。
+
+   ⚠️ 這不是理論。movie-library 的螢幕錄影（1180x2556 的 iPhone、59.94fps）
+      在開場第 76–77 格拍到**畫面下緣一條約 58 CSS px 高的純色 `#0b0d12`**
+      （＝該 app 的 --bg），而**同一格的上半部仍然在正常變亮** ——
+      純色、貼齊畫面最底、iOS 的 home 指示條同時從灰翻白（iOS 認定那塊是深色的），
+      兩格之後自己恢復。兩次開啟位置完全一樣。
+      本機真 Chrome（393x852、開場中取樣）量到的正是同一支槍：
+        getComputedStyle(html).backgroundColor = rgb(195,195,196)（正在沉）
+        getComputedStyle(body).backgroundColor = **rgb(11,13,18)**
+      把 #splash 的高度改短 59px（模擬 iOS 初始化時 fixed 容器還沒定案），
+      露出來那一條量到的就是 **#0b0d12**。
+   ⚠️ v1.6.1 的「開場播放中不畫 app」（`#splash:not(.out) ~ *{visibility:hidden}`）
+      **蓋不到這一條**：那條藏的是 body 的**子元素**，body 自己的背景照畫不誤。
+      （所以那一版沒有把這條深色帶修掉 —— 它根本不是 app 內容，是一塊純色。）
+   ⚠️ 為什麼是 `transparent` 而不是「讓 body 也跑一次 sp-sink-bg」：
+      再跑一條動畫＝**同一條時間線活在兩個地方**，改 token 時必分岔。
+      讓開之後畫布就只剩 §7a 那一條，任何一個瞬間都不可能對不上。
+   ⚠️ reduce 不需要另一條覆寫：那時 §7f 讓 html 直接是 --splash-bg，
+      body 讓開之後看到的就是深色，本來就對。
+   ⚠️ 收場（data-splash="off"）立刻交還給 app 的 --bg；那時 §7a 已經沉到
+      --splash-bg，兩者相等 ⇒ 交還的瞬間沒有色差。 */
+html[data-splash-intro="light"]:not([data-splash="off"]) body{ background:transparent; }
+
 /* 7b. 開場那一層：第一幀是白的，深色底透過 ::before 淡進來 */
 html[data-splash-intro="light"] #splash{ background:var(--sp-start); }
 html[data-splash-intro="light"] #splash::before{

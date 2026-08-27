@@ -61,6 +61,17 @@
      ⚠️ 這兩條的後備值 #ebebeb 必須跟 css/splash.css 的 --sp-start 一致（t14 §75b 在比對）。 */
   html[data-splash-intro="light"]:not([data-splash="off"]){background:var(--sp-start,#ebebeb);}
   html[data-splash-intro="light"] #splash{background:var(--sp-start,#ebebeb);}
+  /* ⭐⭐ v1.6.3：開場播放中，**<body> 自己的底色要讓開**（完整理由在 css/splash.css §7a2）。
+     app.css 的 `body{background:var(--bg)}` 是畫在 html 畫布**上面**的第二層底色，
+     所以只要有一塊畫面沒被 #splash 蓋到，露出來的是那一片**沒有動過的 #0b0d12**，
+     不是上面那條正在沉的顏色。Benson 的錄影第 76–77 格拍到的就是它
+     （下緣一條 58px 高的純色 #0b0d12、home 指示條同時翻白、兩格後恢復）。
+     ⚠️ 這一條**必須也寫在關鍵路徑塊**，不能只寫在 css/splash.css：
+        三支樣式表是非阻塞的，app.css 有可能先到、splash.css 後到，
+        中間那個窗口 body 就是深色的（而那正是錄影拍到的那一刻）。
+     ⚠️ 權重：這條是 (0,3,1)，app.css 的 `body` 是 (0,0,1) ⇒ 不必 !important 也壓得過，
+        跟宣告順序無關（關鍵路徑塊排在 <link> 之前）。 */
+  html[data-splash-intro="light"]:not([data-splash="off"]) body{background:transparent;}
   /* 減少動態：白起整個關掉、退回深色第一幀（理由在 css/splash.css §7f —— 沒有漸變的話，
      白只是多跳一次）。這一塊也要有，不然 reduce 使用者會看到「白一下下 → 深」。 */
   @media (prefers-reduced-motion:reduce){
@@ -572,6 +583,123 @@
   onDomReady(function () { domReady = true; checkGate(); });
 
   /* ============================================================
+     7b. ⭐⭐ <meta name="theme-color"> 跟著開場的底色走（v1.6.3，2026-08-28）
+     ------------------------------------------------------------
+     為什麼要有這一段：
+       iOS 從主畫面開 PWA 時，**頁面之外**的那一圈（safe-area／overscroll／
+       home 指示條那一帶）不是我們畫的，是系統畫的，而系統參考的顏色候選有兩個：
+       manifest 的 background_color（安裝當下抄走、改不動）與 **<meta theme-color>**。
+       深色 app 開淺色開場（白起）時，這兩個值都還說「我是深色的」
+       ⇒ 交接的那一兩格，畫面下緣有機會被畫成一條深色。
+       movie-library 2026-08-28 的螢幕錄影就有這麼一條（58px、純 #0b0d12、
+       home 指示條同時翻白＝ iOS 認定那塊是深色的）。
+       **manifest.background_color 不准動**（動了 iOS 的系統啟動圖才會變，
+       而那要使用者把 app 從主畫面移除重加）⇒ 我們能動的只有 theme-color。
+
+     ⚠️ 這條深色帶有**兩個都說得通的成因**，而且本機複現不出來：
+       ① 系統拿 theme-color 去畫頁面之外 ⇒ 這一段負責；
+       ② 頁面自己有一塊沒被 #splash 蓋到、露出 body 的底色 ⇒ splash.css §7a2 負責。
+       兩個成因的顏色**剛好一樣**（app 的 --bg ＝ theme-color ＝ manifest），
+       所以錄影分不出來是哪一個。兩邊都修，不要挑一個信。
+
+     做法：**追蹤 <html> 當下的 computed background-color**，不是自己再算一次漸變。
+       - 顏色的真相來源只有一個（splash.css §7a 的 sp-sink-bg），
+         這裡只是「把畫面上的顏色抄給系統」⇒ 不可能跟畫面對不上。
+       - 因此**不需要知道任何時長**（--sp-lead／--sp-sink 都不必讀），
+         換 token、換變體、reduce、CSS 沒載到，全部自動正確。
+       - 印記變體與 reduce 之下 html 的底色本來就等於 theme-color
+         ⇒ tcPut() 比對過就跳過，**一個位元組都不會寫** ＝ 這一段對它們是隱形的。
+
+     ⚠️ 狀態列：Benson 的錄影顯示**淺色開場時狀態列文字已經是黑的**，
+        而那時 theme-color 是 #0b0d12（深色）⇒ **iOS 沒有拿 theme-color 決定狀態列文字**
+        （這支 app 用的是 apple-mobile-web-app-status-bar-style=black-translucent，
+        iOS 自己看內容決定）。就算某個版本的 iOS 會看，這裡給的也永遠是
+        **畫面當下的真實底色** ⇒ 「淺底配黑字、深底配白字」自動成立，
+        不會出現「theme-color 說淺、畫面已經變深」那種字看不見的窗口。
+     ⚠️ 收場一定要換回**原本的字面值**（不是等價的 rgb()），
+        否則 app 跑起來之後 theme-color 會變成一個沒人設定過的字串。
+     ⚠️ 只在冷啟動跑。熱啟動不播開場，theme-color 從頭到尾都該是 app 自己的深色。
+     ============================================================ */
+  var TC_META = null, TC_ORIG = null, TC_NOW = null, TC_OFF = false;
+
+  /* 畫面當下的底色（＝ <html> 的 computed background-color）。
+     透明或讀不到就回空字串 —— 寧可不寫，也不要把狀態列交給瀏覽器猜。 */
+  function tcRead() {
+    try {
+      var v = W.getComputedStyle(root).backgroundColor;
+      if (!v || v === "transparent" || v.indexOf(", 0)") > 0) { return ""; }
+      return v;
+    } catch (e) { return ""; }
+  }
+  /* 只為了比對「是不是同一個顏色」：#0b0d12 與 rgb(11, 13, 18) 必須算相等，
+     否則印記變體每一幀都會白寫一次。 */
+  function tcRGB(s) {
+    var t = String(s || "").replace(/\s+/g, "").toLowerCase(), m;
+    if (/^#[0-9a-f]{3}$/.test(t)) {
+      return [parseInt(t.charAt(1) + t.charAt(1), 16),
+              parseInt(t.charAt(2) + t.charAt(2), 16),
+              parseInt(t.charAt(3) + t.charAt(3), 16)].join(",");
+    }
+    if (/^#[0-9a-f]{6}$/.test(t)) {
+      return [parseInt(t.substr(1, 2), 16), parseInt(t.substr(3, 2), 16), parseInt(t.substr(5, 2), 16)].join(",");
+    }
+    m = /^rgba?\((-?\d+),(-?\d+),(-?\d+)/.exec(t);
+    if (m) { return m[1] + "," + m[2] + "," + m[3]; }
+    return t;
+  }
+  function tcPut(v) {
+    if (!TC_META || !v) { return; }
+    if (TC_NOW !== null && tcRGB(v) === tcRGB(TC_NOW)) { return; }
+    TC_NOW = v;
+    try { TC_META.setAttribute("content", v); } catch (e) {}
+  }
+  function tcRestore() {
+    if (TC_OFF) { return; }
+    TC_OFF = true;
+    if (TC_META && TC_ORIG) {
+      TC_NOW = null;   /* 強制寫回原字面值，不要因為「顏色一樣」而留下 rgb(...) */
+      tcPut(TC_ORIG);
+    }
+  }
+  /* 開場收掉了沒？三條路任一條成立都算（跟遮罩那條 CSS 是同一組判準）：
+     data-splash="off"／#splash 離開 DOM／下面的保險絲。
+     ⚠️ `#splash 不在` 這條**必須等 domReady**：這一段在 <head> 就跑了，
+        那時 <body> 根本還沒解析，不擋的話第一個 rAF 就會把自己關掉。 */
+  function tcOver() {
+    try {
+      if (root.getAttribute("data-splash") === "off") { return true; }
+      if (domReady && !D.querySelector(SPLASH_SEL)) { return true; }
+    } catch (e) { return true; }
+    return false;
+  }
+  function tcNext(fn) {
+    try {
+      if (typeof W.requestAnimationFrame === "function") { W.requestAnimationFrame(fn); return; }
+    } catch (e) {}
+    W.setTimeout(fn, 16);
+  }
+  function tcTick() {
+    if (TC_OFF) { return; }
+    if (tcOver()) { tcRestore(); return; }
+    tcPut(tcRead());
+    tcNext(tcTick);
+  }
+  if (COLD) {
+    try { TC_META = D.querySelector('meta[name="theme-color"]'); } catch (e) { TC_META = null; }
+    if (TC_META && TC_META.getAttribute("content")) {
+      TC_ORIG = TC_META.getAttribute("content");
+      /* ⚠️ TC_NOW 要先設成原值，否則第一次寫入沒有東西可以比對 ⇒
+         印記變體（底色本來就等於 theme-color）也會被改寫成等價的 rgb(...)。 */
+      TC_NOW = TC_ORIG;
+      tcPut(tcRead());     /* 第一次繪製之前就要對 */
+      tcNext(tcTick);
+      /* 保險絲：分頁被切到背景時 rAF 會停，這條保證 theme-color 一定換得回來。
+         比交棒保險絲再晚一點（那時開場一定已經被收掉了）。 */
+      W.setTimeout(tcRestore, TAKEOVER_FUSE + 1500);
+    }
+  }
+
+  /* ============================================================
      8. 交給 motion/splash.js（不是公開 API）
      ============================================================ */
   W.SplashBoot = {
@@ -620,7 +748,10 @@
        ⚠️ 第二條是配套：關鍵路徑塊的「開場播放中不畫 App」靠的是
           html[data-splash="off"]，而那個屬性只有 JS 掛得上去。
           JS 停用時它不存在 ⇒ 那條會匹配 ⇒ App 會被藏死。這裡把它解除。 -->
-  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;}</style>
+  <!-- 第三條（v1.6.3）：JS 停用時 <html> 上同樣沒有 data-splash ⇒ 關鍵路徑塊那條
+       「開場播放中 body 底色讓開」也會匹配，畫面會有一秒鐘是淺色的（css/splash.css §7a2）。
+       這裡把 body 的底色釘回 App 自己的 --bg。 -->
+  <style>#splash{display:none !important;} #splash ~ *{visibility:visible !important;} body{background:var(--bg) !important;}</style>
 </noscript>
 <style>
   /* ⭐ 開場外觀的落地值就這一塊（其餘一律不用動 css/splash.css）。
