@@ -65,7 +65,7 @@ npm test
 
 ```bash
 npm run test:mutate -- --dry   # 幾秒：只檢查每條突變的目標字串還套不套得上
-npm run test:mutate            # 約 6 分鐘：把程式各弄壞一次，確認測試真的會紅
+npm run test:mutate            # ⚠ 1.5~2 小時：把程式各弄壞一次，確認測試真的會紅（平常用 --only=）
 ```
 
 `test:mutate` 是用來證明「測試真的在保護那些事」的（跑完自動還原並用 SHA-256 驗證）。

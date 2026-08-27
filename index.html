@@ -1,5 +1,7 @@
 <!doctype html>
-<html lang="zh-Hant">
+<!-- data-splash-intro="light" ＝「白起」開場（v1.6.0）。理由寫在下面關鍵路徑 CSS 那一塊。
+     ⚠️ 必須靜態寫在這裡：用 JS 加的時候第一幀已經畫過了，而且不會報錯。 -->
+<html lang="zh-Hant" data-splash-intro="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -30,10 +32,41 @@
         代價是熱啟動在 CSS 到齊前會露出沒套樣式的 DOM ⇒ 由 js/splash-boot.js 掛上
         html[data-cssgate]，用下面兩條規則壓住（底色仍然是深的，絕不可以是白的）。
         ⚠️ 閘門只有 JS 關得起來 ⇒ JS 被停用或 splash-boot.js 沒載到時，
-           html 上根本不會有 data-cssgate，畫面照常顯示。 -->
+           html 上根本不會有 data-cssgate，畫面照常顯示。
+
+     ⭐⭐ 2026-08-27 v1.6.0：**第一幀從深色改成白色**（Benson 拍板的「白起」開場）。
+        這一整塊上面寫的「第一次繪製必定是深色」那句話，在這一版被**刻意反過來**了，
+        理由是那場賽跑我們沒有贏 —— 他的螢幕錄影逐格（59.94fps）拆開是這樣：
+          0 → 0.50s   iOS 自己的啟動畫面（純黑）
+          0.50 → 0.73s **平滑淡到 #ebebeb**（iOS 把自己那張圖淡出、淡進 WKWebView）
+          0.73s       硬切成 #0b0d12 的深色開場 ← **就是這個硬切讓人覺得閃了一下**
+        那個白不是「瀏覽器還沒畫」的空白（那會是硬切），是一段**平滑漸變**；
+        我們畫得再快也還是排在它後面。所以這一版不再跟它搶，改成**接住它**：
+        第一幀就是 #ebebeb，然後 700ms 平順沉成 #0b0d12，「雷」在過程中浮出來。
+        ⇒ **白不再是意外，是開場的第一拍**，畫面上沒有任何硬切點可以「閃」。
+
+        ⚠️ 舊契約「關鍵路徑的後備底色 === manifest.background_color」**沒有被放寬，是換了對象**：
+           現在 manifest（#0b0d12）對應的是**開場沉到最後的底色**，
+           以及熱啟動／閘門關著那兩段（那兩段本來就不播開場，該是 App 自己的深色）。
+           **第一幀**的顏色由 <html data-splash-intro="light"> 決定，走 var(--sp-start,#ebebeb)。
+        ⚠️ 我們**刻意不改 manifest.background_color**（那是另一條路 C1：連 iOS 系統啟動圖
+           一起變白、完全沒有接縫，但**要 Benson 把 App 從主畫面移除重加**。他選了不用重加的這一版）。
+        ⚠️ 漸變本體在 css/splash.css §7（非阻塞），所以三支 CSS 全掛時畫面會**停在白色**
+           直到開場被收掉。這是刻意的取捨：關鍵路徑塊只放「靜止的第一幀」，不放動畫
+           —— 放了就是同一條規則活在兩個地方，換色時必分岔。 -->
 <style>
   html:not([data-splash="off"]),
   html[data-cssgate]{background:var(--splash-bg,#0b0d12);}
+  /* 白起：開場播放中（冷啟動、還沒收場）第一幀就是 iOS 淡出後留下的那片白。
+     ⚠️ 這兩條的後備值 #ebebeb 必須跟 css/splash.css 的 --sp-start 一致（t14 §75b 在比對）。 */
+  html[data-splash-intro="light"]:not([data-splash="off"]){background:var(--sp-start,#ebebeb);}
+  html[data-splash-intro="light"] #splash{background:var(--sp-start,#ebebeb);}
+  /* 減少動態：白起整個關掉、退回深色第一幀（理由在 css/splash.css §7f —— 沒有漸變的話，
+     白只是多跳一次）。這一塊也要有，不然 reduce 使用者會看到「白一下下 → 深」。 */
+  @media (prefers-reduced-motion:reduce){
+    html[data-splash-intro="light"]:not([data-splash="off"]),
+    html[data-splash-intro="light"] #splash{background:var(--splash-bg,#0b0d12);}
+  }
   /* 全掃描不是白名單：body 底下除了開場以外一律先壓住，
      以後多加一個浮動元素也不會漏 */
   html[data-cssgate] body > *:not(#splash){visibility:hidden;}

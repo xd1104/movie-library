@@ -25,11 +25,16 @@
                    accent:"#3a7bd5", ink:"#e6edf3", tagline:"紀律比行情重要" }
      }
 
+   開場變體（opt-in，2026-08-27）：<html data-splash-intro="light"> ＝「白起」。
+     CSS 那一半在 motion/splash.css §7；這支只需要跟著把最短顯示拉長（見 MIN_SHOW）。
+     兩邊讀**同一個**屬性，才不可能出現「CSS 演白起、JS 用印記的長度」這種分岔。
+
    對外 API（window.Splash）：
      Splash.hold()    有資料要等的 app：在最上面呼叫，宣告「我會自己說什麼時候好」
      Splash.ready()   資料回來（成功或失敗都要）呼叫，開場就會收
      Splash.dismiss() 立刻收（測試用）
-     Splash.state()   目前狀態（QA 用：冷啟動與否、實際套用的外觀、已過幾毫秒）
+     Splash.state()   目前狀態（QA 用：冷啟動與否、實際套用的外觀、已過幾毫秒、
+                      現在演的是哪一個變體 state().intro）
    ============================================================ */
 (function () {
   "use strict";
@@ -72,15 +77,29 @@
   var COLD = B.cold;
   var LOOK = B.look;
 
+  /* ⭐ 開場變體（opt-in）：<html data-splash-intro="light"> ＝「白起」，見 motion/splash.css §7。
+     這裡只需要知道一件事 —— 白起那一版的動作**比印記長**，所以最短顯示要跟著長。
+     ⚠️ 讀的是 <html> 上的**靜態屬性**（CSS 也是讀同一個），不是另一個設定檔：
+        兩邊看同一個開關，才不可能出現「CSS 是白起、JS 卻用印記的時間」這種分岔。 */
+  var INTRO = "";
+  try { INTRO = root.getAttribute("data-splash-intro") || ""; } catch (e) {}
+  var LIGHT = INTRO === "light";
+
   /* 時間常數＝產品邏輯，不是動效 token（所以在 JS 不在 CSS） */
-  var MIN_SHOW = REDUCE ? 300 : 950;   /* B 模式最短顯示：避免快取秒回時「閃一下」的廉價感。
-                                          ⭐ 950 是 Benson 2026-08-26 試用後拍板的：開場的動作本身約 640ms
-                                          就收尾（--sp-hold 220 ＋ 動作 420），最短顯示 650 等於「動作剛做完
-                                          就走」，沒有一拍讓人看清楚 ⇒ 多留約 300ms 的定格。
-                                          ⚠️ 要的是「多停留」不是「變慢」——動作速度是已定案的沉穩基調，
-                                             不可以改用放慢 --dur-* 或 --sp-hold 來達成。
-                                          ⚠️ 這一段是從 **boot 的 t0** 起算（B.elapsed()），不是從這支檔案
-                                             被執行起算 —— 拆檔之後兩者差幾十毫秒到幾百毫秒。 */
+  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1230 : 950);
+  /* 白起（light）＝ 1230ms：漸深 --sp-sink 700（＝dur-3 420 ＋ dur-2 280）
+     ＋ 名字 sp-up dur-3 420（它是 delay 700 才開始的）＝ 動作在 1120ms 結束，
+     再留 110ms 讓名字站住一拍。印記那一版的動作在 920ms 結束、最短顯示 950，
+     同樣是「動作做完再留一拍」—— 兩個變體用的是同一條規則，不是各喊各的數字。
+     ⚠️ 改 --sp-sink 或 --dur-* 就要回來重算這個數字（沒有第二個地方會提醒你）。 */
+  /* 印記（預設）＝ 950ms：B 模式最短顯示，避免快取秒回時「閃一下」的廉價感。
+     ⭐ 950 是 Benson 2026-08-26 試用後拍板的：開場的動作本身約 640ms 就收尾
+        （--sp-hold 220 ＋ 動作 420），最短顯示 650 等於「動作剛做完就走」，
+        沒有一拍讓人看清楚 ⇒ 多留約 300ms 的定格。
+     ⚠️ 要的是「多停留」不是「變慢」——動作速度是已定案的沉穩基調，
+        不可以改用放慢 --dur-* 或 --sp-hold 來達成。
+     ⚠️ 這一段是從 **boot 的 t0** 起算（B.elapsed()），不是從這支檔案被執行起算
+        —— 拆檔之後兩者差幾十毫秒到幾百毫秒。 */
   var FUSE = 6000;                     /* 保險絲：不管發生什麼，超過就一定收 */
   var OUT_MS = REDUCE ? 60 : 340;      /* 收場動畫長度（要對得上 --sp-out） */
   var BOOT_MS = 1400;                  /* .boot 掛多久（久了會壓到 :active） */
@@ -276,6 +295,9 @@
         fromCache: !B.isEmpty(B.cached),
         dismissed: dismissed,
         elapsed: Math.round(elapsed()),
+        /* 開場變體：""（預設印記）或 "light"（白起）。QA 要能直接讀到「我現在演的是哪一版」，
+           不要靠時間去猜 —— 猜出來的東西會被機器忙碌度影響。 */
+        intro: INTRO,
         minShow: MIN_SHOW,
         reduce: REDUCE,
         cacheKey: B.cacheKey,

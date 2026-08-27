@@ -5,7 +5,7 @@
    ⚠️ 跑的時候不要同時改專案裡的檔案（雜湊會對不起來）。
 
    用法：
-     npm run test:mutate                跑全部（約 6 分鐘）
+     npm run test:mutate                跑全部（⚠ 這台機器實測 1.5~2 小時：161 條 x 每條一次完整套件 ~40 秒）
      npm run test:mutate -- --dry       只檢查每條突變的目標字串還套不套得上（幾秒鐘）
      npm run test:mutate -- --only=M40,R1  只跑指定前綴的突變
 
@@ -246,7 +246,11 @@ const M = [
     `  html[data-cssgate]{background:var(--splash-bg,#0b0d12);}`,
     `  html[data-cssgate]{background:var(--splash-bg,#0c0d12);}`],
   ["X19 開場最短顯示調回 650（動作剛做完就走，沒有那一拍定格）", "js/splash.js",
-    `  var MIN_SHOW = REDUCE ? 300 : 950;`, `  var MIN_SHOW = REDUCE ? 300 : 650;`],
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1230 : 950);`,
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 650 : 950);`],
+  ["X36 白起用回印記的最短顯示（名字還沒演完就被收掉）", "js/splash.js",
+    `  var MIN_SHOW = REDUCE ? 300 : (LIGHT ? 1230 : 950);`,
+    `  var MIN_SHOW = REDUCE ? 300 : 950;`],
   ["X20 關鍵路徑把符號字色寫死（不再跟著 onColor，鑰匙圈換色就分岔）", "index.html",
     `    color:var(--splash-on-accent);`, `    color:#ffffff;`],
   /* ---- v1.4.2 關鍵路徑只留必要的東西（t14 §77／t13 在守） ---- */
@@ -301,6 +305,52 @@ const M = [
   ["X33 splash.js 又自己寫一份 onColor（換色時兩份會分岔）", "js/splash.js",
     `  W.__splashTakeover = true;`,
     `  W.__splashTakeover = true;\n  function onColor(bg){ return "#ffffff"; }`],
+  /* ---- v1.6.0「白起」開場（t14 §60／§71／§75b 在守） ----
+     ⚠️ 誠實記一筆：下面凡是動 js/splash.js 或 css/splash.css 的突變，
+        §74（跟 app-template 正本比 SHA-256）**一定會紅**，所以它們證明不了 §75b 本身承重。
+        §75b 的承重性是另外用「正本與副本同時改」的配對突變單獨驗過的
+        （那樣 §74 保持綠，紅的只會是 §75b）——結果寫在 CLAUDE.md 第 34 條。
+        這裡仍然把它們列進來，是因為「有人只改了副本」本來就該紅。
+     ⭐ 動 index.html 的那幾條沒有這個問題（柵欄以外的部分不受 SHA 約束），是真正的證據。 */
+  ["X37 有人把白起的開關拿掉（第一幀又變回深色，硬切回來）", "index.html",
+    `<html lang="zh-Hant" data-splash-intro="light">`, `<html lang="zh-Hant">`],
+  ["X38 白起的開關打錯字（CSS 與 JS 都不生效，而且不會有任何徵兆）", "index.html",
+    `<html lang="zh-Hant" data-splash-intro="light">`, `<html lang="zh-Hant" data-splash-intro="Light">`],
+  ["X39 拿掉關鍵路徑的白起底色（CSS 全掛時第一幀又變成深色）", "index.html",
+    `  html[data-splash-intro="light"]:not([data-splash="off"]){background:var(--sp-start,#ebebeb);}\n`, ``],
+  ["X40 關鍵路徑的白起後備色跟 --sp-start 分岔（CSS 到位前後會跳一次色）", "index.html",
+    `  html[data-splash-intro="light"] #splash{background:var(--sp-start,#ebebeb);}`,
+    `  html[data-splash-intro="light"] #splash{background:var(--sp-start,#ffffff);}`],
+  ["X41 有人把 --sp-start 改成純白（交接點會多一階看得見的亮度跳動）", "css/splash.css",
+    `  --sp-start:#ebebeb;`, `  --sp-start:#ffffff;`],
+  ["X42 有人把 --sp-start 改成 manifest 的深色「讓顏色統一」（等於把白起整個關掉）", "css/splash.css",
+    `  --sp-start:#ebebeb;`, `  --sp-start:#0b0d12;`],
+  ["X43 名字不等漸深結束就出現（淺字壓在亮底上讀不到）", "css/splash.css",
+    `  animation:sp-up var(--dur-3) var(--ease) backwards var(--sp-sink);`,
+    `  animation:sp-up var(--dur-3) var(--ease) backwards;`],
+  ["X44 漸深塞回 #splash 自己的 animation（跟收場的淡出搶同一條時間線）", "css/splash.css",
+    `html[data-splash-intro="light"] #splash::before{`,
+    `html[data-splash-intro="light"] #splash.__never__::before{`],
+  ["X45 光環沒有明確關掉（亮底上散出一圈沒人要的金環）", "css/splash.css",
+    `html[data-splash-intro="light"] .sp-ring{ animation:none; }\n`, ``],
+  ["X46 --sp-sink 改成寫死 700ms（不再跟著沉穩 token 走）", "css/splash.css",
+    `  --sp-sink:calc(var(--dur-3) + var(--dur-2));`, `  --sp-sink:700ms;`],
+  /* ⭐ X49 是「守衛的守衛」：改判準之前這一條是**綠的** —— 斷言原本寫 `@keyframes\s+sp-sink\b`，
+     而 `\b` 在 `sp-sink-bg` 的那個連字號上也成立 ⇒ 把 sp-sink 整個改名，
+     斷言會被隔壁的 sp-sink-bg 餵飽而放行。留著這條是為了以後不要再犯。 */
+  ["X49 漸深的 keyframes 被改名（判準只要寫成 \\b 就會被 sp-sink-bg 餵飽而放行）", "css/splash.css",
+    `@keyframes sp-sink{ from{opacity:0;} to{opacity:1;} }`,
+    `@keyframes sp-sunk{ from{opacity:0;} to{opacity:1;} }`],
+  ["X47 reduce 之下沒有把白起關掉（沒有漸變還留著白 ＝ 多跳一次）", "css/splash.css",
+    `  html[data-splash-intro="light"]:not([data-splash="off"]){
+    background:var(--splash-bg);
+    animation:none;
+  }\n`, ``],
+  ["X48 關鍵路徑塊漏了 reduce 覆寫（只改一邊 ⇒ reduce 會看到「白一下下 → 深」）", "index.html",
+    `  @media (prefers-reduced-motion:reduce){
+    html[data-splash-intro="light"]:not([data-splash="off"]),
+    html[data-splash-intro="light"] #splash{background:var(--splash-bg,#0b0d12);}
+  }\n`, ``],
   ["對照組 無害改動（預期全綠）", "js/config.js", VERLINE, VERLINE + " /* 註解 */"]
 ];
 

@@ -107,12 +107,30 @@ function withBootOnly(extra) {
 }
 
 /* ================================================================
-   §60 開場底色：四個地方必須逐字一致
-   （不一致的症狀是「iPhone 從主畫面開 App 會白閃一下」——
-     那是 iOS 先畫一張 background_color 的系統開場，關不掉。
-     在電腦上永遠看不到，也不會有人回報，所以一定要機器比對。）
+   §60 開場「結束時」的底色：四個地方必須逐字一致
+   ----------------------------------------------------------------
+   ⚠️⚠️ 契約在 v1.6.0（2026-08-27）被**重新定義**過，理由一起寫在這裡，
+        因為只看斷言的話會以為它被放寬了。
+
+   舊契約：「--splash-bg 必須逐字等於 manifest.background_color，
+            否則 iPhone 從主畫面開 App 會白閃一下。」
+            —— 它的隱含前提是「**第一次繪製的底色 ＝ --splash-bg**」。
+
+   新契約：**開場「沉到最後」的底色** ＝ --splash-bg ＝ manifest.background_color
+            ＝ <meta theme-color> ＝ SPLASH_CONFIG.defaults.bg ＝ app.css 的 --bg。
+            v1.6.0 的「白起」開場**刻意讓第一幀跟 manifest 不一樣**
+            （第一幀是 #ebebeb 的白，manifest 維持 #0b0d12），
+            因為它要接住的正是 iOS 把自己的啟動畫面淡出之後留下的那片白。
+
+   為什麼這不是「為了讓測試變綠而砍掉它」：
+     兩個契約要守的是同一件事 —— **畫面上不可以有一個沒人設計過的顏色跳動**。
+     舊做法是「全部對齊成同一個色」；白起的做法是「把那個跳動變成一段設計過的漸變，
+     而漸變的**終點**仍然對齊」。所以這一節照樣是硬界線，只是量的是終點不是第一幀。
+     **第一幀由 §75／§75b 負責**，那裡才是這次真正被翻過來的地方，
+     而且那裡新增了「起點**必須**跟 manifest 不一樣」的反向斷言 ——
+     沒有那條的話，有人把 --sp-start 改成 #0b0d12「讓顏色統一」就會靜靜地把白起變回舊版。
    ================================================================ */
-section("60. 開場底色四處逐字一致（manifest 不用改的前提就是這一條）");
+section("60. 開場**結束時**的底色四處逐字一致（第一幀不在這一節，見 §75b）");
 {
   const cssBg = (/--splash-bg:\s*(#[0-9a-fA-F]{3,8})/.exec(IDX) || [])[1];
   const meta = (/<meta name="theme-color" content="(#[0-9a-fA-F]{3,8})">/.exec(IDX) || [])[1];
@@ -128,6 +146,14 @@ section("60. 開場底色四處逐字一致（manifest 不用改的前提就是�
   ok(MF.theme_color === cssBg, "manifest.theme_color 也一樣");
   /* 負控組：證明這個比對真的會失敗，不是恆真 */
   ok(cssBg !== "#123456", "負控：拿一個不一樣的色碼比，結果必須是「不相等」");
+
+  /* ⭐ 新契約的另一半：manifest **刻意沒有跟著改**。
+     這條是在擋「有人看到第一幀是白的，就順手把 manifest 也改白」——
+     那是另一條路（C1），代價是 Benson 必須把 App 從主畫面移除重加，他明確選了不要。
+     ⚠️ 這不是美觀偏好，是**會讓他的 localStorage 看起來像被清掉**的動作。 */
+  ok(MF.background_color === "#0b0d12",
+    "★ manifest.background_color 仍然是深色 #0b0d12（**刻意不改**：改了 iOS 的系統啟動圖才會變，"
+    + "而那要他把 App 從主畫面移除重加 —— 2026-08-27 他選了不用重加的那一版）");
 }
 
 section("61. 開場外觀＝這支 App 自己的品牌（不是範本的預設值）");
@@ -520,20 +546,43 @@ section("71. 開場：冷啟動播、收得掉、收掉之後從 DOM 移除");
   ok(w.document.documentElement.style.getPropertyValue("--splash-glyph") === '"雷"', "★ 符號也是");
   await tick(w, 400);
   ok(!!d.getElementById("splash"), "★ 資料還沒到（400ms）時開場還在，蓋住等待");
-  /* ⭐ 800ms 這一刀是專門用來釘住「最短顯示是 950 不是 650」的：
-     650 的話這個時間點開場已經在收場動畫的尾巴、甚至已經 remove 掉了。 */
-  await tick(w, 400);
+  /* ⭐ 1400ms 這一刀是專門用來釘住「白起的最短顯示是 1230 不是 950」的：
+     950 的話 dismiss 在 950ms 發動、收場 OUT_MS+60=400ms，1350ms 就已經從 DOM remove 掉了。
+     （v1.5.0 這一刀原本在 800ms，用來釘 950 vs 650；白起把整條時間線往後推，
+       刀子不跟著移動的話這條就變成「兩個值都會過」＝ 等於沒在釘。） */
+  await tick(w, 1000);
   ok(!!d.getElementById("splash"),
-    "★ 800ms 時開場仍在畫面上（最短顯示 950ms —— 動作 640ms 做完之後還要有一拍定格）");
+    "★ 1400ms 時開場仍在畫面上（白起的最短顯示 1230ms —— 名字到 1120ms 才演完，還要有一拍定格）");
   await tick(w, 900);
   ok(!d.getElementById("splash"), "★ 資料到了就收，而且是從 DOM remove 掉（不是 hidden）");
   ok(d.querySelectorAll(".row[data-open]").length === 6, "★ 收掉之後片單是好的（開場沒有拖慢也沒有擋住）");
   ok(w.Splash.state().dismissed === true, "state() 也說收掉了");
   /* 直接讀模組自己回報的常數，不用時間去推——時間會被機器忙碌度影響，這條不會 */
-  ok(w.Splash.state().minShow === 950,
-    "★ 最短顯示釘死在 950ms（Benson 2026-08-26 拍板：多一拍定格；**不是**把動作放慢）"
+  ok(w.Splash.state().intro === "light",
+    "★ 演的是「白起」變體（state().intro，直接讀開關不用猜）：" + JSON.stringify(w.Splash.state().intro));
+  ok(w.Splash.state().minShow === 1230,
+    "★ 最短顯示釘死在 1230ms —— 白起的動作到 1120ms 才結束（漸深 700 ＋ 名字 420），"
+    + "再留 110ms 定格。跟印記那一版的 950 是**同一條規則**（動作做完再留一拍），不是另外喊的數字"
     + "，實際 " + w.Splash.state().minShow);
-  ok(w.Splash.state().elapsed >= 950, "★ 最短顯示 950ms 有守住（實際 " + w.Splash.state().elapsed + "ms）");
+  ok(w.Splash.state().elapsed >= 1230, "★ 最短顯示 1230ms 有守住（實際 " + w.Splash.state().elapsed + "ms）");
+  /* ⭐ 這個數字不是憑空來的：它必須等於「漸深長度 ＋ 名字動畫長度 ＋ 一拍」。
+     漸深長度從 css/splash.css 的 --sp-sink（= --dur-3 + --dur-2）與 motion.css 的 token 真的算一次，
+     不是把 1230 抄兩遍 —— 抄兩遍的話改了 token 這條照樣綠。 */
+  {
+    const tok = n => Number((new RegExp("--dur-" + n + ":\\s*(\\d+)ms").exec(MOTION) || [])[1]);
+    const d1 = tok(1), d2 = tok(2), d3 = tok(3);
+    ok(d1 === 180 && d2 === 280 && d3 === 420, "★ 尺沒壞：從 motion.css 讀到 --dur-1/2/3 = " + [d1, d2, d3].join("/"));
+    ok(/--sp-sink:\s*calc\(var\(--dur-3\)\s*\+\s*var\(--dur-2\)\)/.test(SPLASHCSS),
+      "★ --sp-sink 是由 --dur-3 ＋ --dur-2 算出來的（沒有引進新時長）");
+    const sink = d3 + d2;                 /* 700 */
+    const nameEnd = sink + d3;            /* 1120：名字 delay=--sp-sink，長度 --dur-3 */
+    ok(sink === 700 && nameEnd === 1120, "★ 算出來的漸深 " + sink + "ms、動作結束 " + nameEnd + "ms");
+    ok(w.Splash.state().minShow > nameEnd,
+      "★ 最短顯示（" + w.Splash.state().minShow + "）大於動作結束的時間（" + nameEnd
+      + "）—— 名字一定演得完，不會被收場切掉");
+    ok(w.Splash.state().minShow - nameEnd === 110,
+      "★ 而且多出來的正好是那一拍定格 110ms（改 --dur-* 而忘了回頭改 MIN_SHOW 的話這條會紅）");
+  }
 }
 
 section("71b. 熱啟動不重播（切分頁、返回、重新整理同一個 session）");
@@ -683,10 +732,12 @@ section("73. 鑰匙圈讀外觀：快取優先、背景更新、下次冷啟動�
     });
   }
   const CK = "splash:movie-library";
-  /* 讀鑰匙圈是在開場收掉之後才發動的：MIN_SHOW 950 → 收場 OUT_MS+60=400 → afterSplash 再等 400。
-     所以要等到 1750ms 之後才會有結果，這裡取 2100 留餘裕。
-     ⚠️ 這個數字跟著 splash.js 的 MIN_SHOW 走 —— 改 MIN_SHOW 要回來看這一行。 */
-  const KR_WAIT = 2100;
+  /* 讀鑰匙圈是在開場收掉之後才發動的：MIN_SHOW → 收場 OUT_MS+60=400 → afterSplash 再等 400。
+     v1.6.0 白起把 MIN_SHOW 從 950 拉到 1230 ⇒ 1230+400+400 = **2030ms** 才會有結果。
+     舊的 2100 只剩 70ms 餘裕（跟 jsdom 的排程抖動同一個量級）⇒ 拉到 2400。
+     ⚠️ 這個數字跟著 splash.js 的 MIN_SHOW 走 —— 改 MIN_SHOW 要回來看這一行。
+     ⚠️ 而且它是「等夠久」不是「等剛好」：太短會變成偽陰性（看起來像鑰匙圈壞了）。 */
+  const KR_WAIT = 2400;
 
   /* ① 正常：讀得到 → 寫進快取，但這一次的畫面不可以中途換字 */
   {
@@ -806,9 +857,14 @@ section("75. 第一次繪製必定是深色：關鍵路徑 CSS 要 inline 在所
   ok(htmlBg && htmlBg[1] === (/<meta name="theme-color" content="(#[0-9a-fA-F]{3,8})">/.exec(IDX) || [])[1],
     "★ 後備色也 === <meta theme-color>");
 
-  /* ② 蓋滿：外部 CSS 沒到時，#splash 仍然要是覆蓋全螢幕的那一層 */
-  const spRule = /#splash\s*\{([\s\S]*?)\}/.exec(CRIT);
-  ok(!!spRule, "★ 關鍵路徑塊裡有 #splash 規則");
+  /* ② 蓋滿：外部 CSS 沒到時，#splash 仍然要是覆蓋全螢幕的那一層。
+     ⚠️ 一定要抓「**裸的** #splash{...}」那一條，不可以用 /#splash\s*\{/ 直接撈第一個 ——
+        v1.6.0 加了 `html[data-splash-intro="light"] #splash{...}` 之後，
+        那個天真的正則會撈到白起的覆寫（它只有 background 一行）⇒ 守衛回報
+        「#splash 沒有蓋滿、沒有 z-index、沒有底色」＝ 尺壞了但看起來像實作壞了。
+        （同一類錯誤第三次：「先抓整體再驗屬性」——這裡是「先確定抓到的是哪一條規則」。） */
+  const spRule = /(?:^|[};])\s*#splash\s*\{([\s\S]*?)\}/.exec(CRIT);
+  ok(!!spRule, "★ 關鍵路徑塊裡有裸的 #splash{...} 規則（不是某個祖先選擇器底下那一條）");
   const sp = spRule ? NOWS(spRule[1]) : "";
   ok(/position:fixed/.test(sp) && /inset:0/.test(sp),
     "★ #splash 一出現就蓋滿（position:fixed ＋ inset:0）");
@@ -861,6 +917,144 @@ section("75. 第一次繪製必定是深色：關鍵路徑 CSS 要 inline 在所
   ok(!/html[^{]*\{[^}]*background:\s*var\(--splash-bg,/.test(FAKE),
     "負控：一段沒有 html 背景的 CSS，比對結果必須是「不合格」");
   ok(!/position:fixed/.test(NOWS(FAKE)), "負控：沒有 position:fixed 的規則也必須判成不合格");
+  ok(/(?:^|[};])\s*#splash\s*\{/.test("}\n#splash{background:red;}") &&
+     !/(?:^|[};])\s*#splash\s*\{/.test('html[data-x="y"] #splash{background:red;}'),
+    "負控：「裸的 #splash 規則」這把尺分得出 `#splash{` 與 `祖先 #splash{`（v1.6.0 就是被這個咬到的）");
+}
+
+/* ================================================================
+   §75b ⭐⭐ 第一次繪製是**白色**（v1.6.0「白起」開場，2026-08-27 Benson 拍板）
+   ----------------------------------------------------------------
+   ⚠️⚠️ 這一節把 §75 的「第一次繪製必定是深色」**整個反過來**。
+        不是放寬，是**需求變了**，理由如下（不寫清楚的話下一個人會把它「修」回去）：
+
+   v1.5.0 賭的是「趕在 iOS 開始淡出（約 0.50s）之前畫出第一幀，白色會整個消失」。
+   Benson 的螢幕錄影逐格（59.94fps）顯示我們**沒有贏**：
+
+     0 → 0.50s     iOS 自己的啟動畫面（純黑）
+     0.50 → 0.73s  **平滑淡到 #ebebeb**（iOS 把自己那張圖淡出、淡進 WKWebView）
+     0.73s         硬切成 #0b0d12 的深色開場 ← **就是這個硬切讓人覺得閃了一下**
+
+   關鍵事實是：那個白**不是「瀏覽器還沒畫」的瞬間空白**（那會是硬切），
+   是一段 iOS 自己在跑的**平滑漸變**，我們畫得再快也還是排在它後面。
+   ⇒ 所以這一版不再跟它搶，改成**接住它**：第一幀就是 #ebebeb，
+     700ms 內平順沉成 #0b0d12，符號在過程中浮出來。
+     **白不再是意外，是開場的第一拍**，畫面上沒有任何硬切點可以「閃」。
+
+   §75 那一節要守的東西**一個字都沒有放掉**：
+   「第一次繪製的顏色是**我們決定**的，不是外部 CSS 載不載得到決定的」。
+   只是「我們決定的顏色」現在是白的，而且到底是哪一種由 <html data-splash-intro> 決定。
+   ⇒ 所以這一節除了驗「第一幀是白的」，還要驗**反向**的那條：
+     起點色**必須**跟 manifest 不一樣（不然有人把 --sp-start 改成 #0b0d12
+     「讓顏色統一」就會靜靜地把白起變回舊版，而且不會有任何徵兆）。
+
+   ⛔ 刻意不做的那條路（C1）：連 manifest.background_color 一起改白 ——
+      那樣連 iOS 的系統啟動圖都是白的、全程沒有接縫，但**要 Benson 把 App 從主畫面
+      移除、重新加一次**（系統啟動圖是安裝當下抄走的），而且他的 localStorage
+      看起來會像被清掉。他明確選了不用重加的這一版。§60 有一條在釘 manifest 沒被改。
+   ================================================================ */
+section("75b. 白起：第一幀是 #ebebeb，而且**只靠 index.html 自己**（外部 CSS 全掛也成立）");
+{
+  const CRIT = NOWS(noComment(STYLE_BLOCKS[0]));
+
+  /* ① 開關：必須靜態寫在 <html> 上。用 JS 加的話第一幀已經畫過了，而且不會報錯。 */
+  const htmlTag = (/<html\b[^>]*>/.exec(IDX) || [""])[0];
+  ok(/\bdata-splash-intro="light"/.test(htmlTag),
+    "★ <html> 上有 data-splash-intro=\"light\"（唯一的開關）：" + htmlTag);
+  ok(IDX.indexOf('setAttribute("data-splash-intro"') < 0 &&
+     IDX.indexOf("setAttribute('data-splash-intro'") < 0,
+    "★ 沒有任何地方用 JS 去設它（JS 設的時候第一幀已經畫完了＝這個變體等於沒開）");
+
+  /* ② 起點色的單一真相來源：css/splash.css 的 --sp-start。
+     關鍵路徑塊裡的後備字面值必須跟它逐字一致（不一致＝CSS 到位的前後會跳一次色）。 */
+  const modStart = (/--sp-start:\s*(#[0-9a-fA-F]{3,8})/.exec(noComment(SPLASHCSS)) || [])[1];
+  ok(!!modStart, "★ 尺沒壞：css/splash.css 裡讀得到 --sp-start（" + modStart + "）");
+  ok(modStart === "#ebebeb",
+    "★ 起點色是 #ebebeb —— **逐格量出來的 iOS 交接色**，不是 #ffffff。"
+    + "寫純白會在交接點留一階看得見的亮度跳動，那正是這一版要消滅的東西");
+
+  const litHtml = /html\[data-splash-intro="light"\]:not\(\[data-splash="off"\]\)[^{}]*\{[^}]*background:var\(--sp-start,(#[0-9a-fA-F]{3,8})\)/.exec(CRIT);
+  const litSp = /html\[data-splash-intro="light"\]#splash[^{}]*\{[^}]*background:var\(--sp-start,(#[0-9a-fA-F]{3,8})\)/.exec(CRIT);
+  ok(!!litHtml, "★ 關鍵路徑塊裡有 <html> 的白起底色覆寫（開場播放中，第一幀就是白的）");
+  ok(!!litSp, "★ 關鍵路徑塊裡也有 #splash 的白起底色覆寫（#splash 不靠繼承）");
+  ok(litHtml && litHtml[1] === modStart,
+    "★ html 覆寫的後備色 " + (litHtml && litHtml[1]) + " === css/splash.css 的 --sp-start " + modStart);
+  ok(litSp && litSp[1] === modStart,
+    "★ #splash 覆寫的後備色 " + (litSp && litSp[1]) + " 也 === --sp-start");
+
+  /* ③ ⭐ 反向斷言：起點**必須**跟終點不一樣，否則整個變體等於沒開。
+     這條就是「不要為了讓測試變綠而把契約砍掉」的那一半 —— 有它，
+     「把 --sp-start 改成 #0b0d12 讓顏色統一」會立刻紅。 */
+  ok(modStart.toLowerCase() !== MF.background_color.toLowerCase(),
+    "★ 起點色 " + modStart + " **刻意不等於** manifest.background_color " + MF.background_color
+    + "（相等＝沒有漸變＝這個變體等於沒開，而且畫面上看起來只是「開場又變回深色的」）");
+  ok(contrast(modStart, MF.background_color) > 8,
+    "★ 而且兩者差得夠遠（對比 " + contrast(modStart, MF.background_color).toFixed(1)
+    + ":1）—— 這是一段真的看得見的漸變，不是四捨五入的色差");
+
+  /* ④ 熱啟動與閘門那兩段**不可以**跟著變白：它們本來就不播開場，該是 App 自己的深色。
+     判準是那兩條選擇器都帶著 :not([data-splash="off"])／或根本不含 data-splash-intro。 */
+  ok(/html\[data-cssgate\]\{background:var\(--splash-bg,/.test(CRIT) ||
+     /html\[data-cssgate\][^{,]*[,{][^}]*background:var\(--splash-bg,/.test(CRIT),
+    "★ 閘門關著時（熱啟動、CSS 還沒到）底色仍然是 --splash-bg 的深色，不是白的");
+  ok(litHtml && litHtml[0].indexOf(':not([data-splash="off"])') >= 0,
+    "★ 白起的底色只在「還沒收場」時生效（帶 :not([data-splash=\"off\"])）"
+    + " —— 收掉開場之後就交還給 app.css 的 --bg");
+
+  /* ⑤ 漸深與時序的本體在 css/splash.css（範本的 opt-in 變體），不是在這裡另寫一份 */
+  const SC = noComment(SPLASHCSS);
+  /* ⚠️ 判準是 `sp-sink\s*\{` 不是 `sp-sink\b`：`\b` 在 `sp-sink-bg` 的連字號上也成立 ⇒
+     把 sp-sink 整個改名，斷言會被 sp-sink-bg 餵飽而放行。
+     2026-08-27 用突變實打出來的（改判準之前那條真的是綠的）。
+     三條 keyframes 缺一不可：底色（html）／漸深（::before）／符號浮出。 */
+  for (const kf of ["sp-sink", "sp-sink-bg", "sp-emerge"]) {
+    ok(new RegExp("@keyframes\\s+" + kf + "\\s*\\{").test(SC),
+      "★ css/splash.css 有 @keyframes " + kf + "（白起的三段動作缺一不可）");
+  }
+  ok(!/@keyframes\s+sp-sink\s*\{/.test("@keyframes sp-sink-bg{from{}}"),
+    "負控：`sp-sink\\s*{` 這把尺不可以被 sp-sink-bg 餵飽（用 \\b 的話會，這就是上面那個坑）");
+  ok(/html\[data-splash-intro="light"\]\s*#splash::before\s*\{/.test(SC),
+    "★ 漸深走 #splash::before 的 opacity —— 不可以塞進 #splash 自己的 animation，"
+    + "那條已經被收場的 sp-fade-out 佔用了（兩條時間線搶同一個屬性，收場時漸深會被重播）");
+  ok(!/@keyframes\s+sp-sink\b/.test(noComment(STYLE_BLOCKS.join("\n"))),
+    "★ index.html 裡**沒有**第二份 sp-sink（關鍵路徑塊只放靜止的第一幀，不放動畫："
+    + "放了就是同一條規則活在兩個地方，換色時必分岔）");
+  ok(/html\[data-splash-intro="light"\]\s*\.sp-ring\{\s*animation:none;\s*\}/.test(NOWS(SC).replace(/;/g, ";")) ||
+     /\.sp-ring\{animation:none;\}/.test(NOWS(SC)),
+    "★ 光環是用 animation:none 明確關掉的（§5 的 .sp-ring 是無條件帶動畫的，"
+    + "靠「沒寫規則」關不掉，會在亮底上散出一圈沒人要的金環）");
+  ok(/html\[data-splash-intro="light"\]#splash\.sp-name\{animation:sp-upvar\(--dur-3\)var\(--ease\)backwardsvar\(--sp-sink\)/.test(NOWS(SC)),
+    "★ 名字的 delay ＝ --sp-sink（等底色沉完才出現：淺色字壓在亮底上讀不到）");
+
+  /* ⑤b 減少動態：白起整個關掉、退回深色第一幀。
+     ⭐ 這不是「順便處理 reduce」，是變體定義決定的：白起的價值全部在那段漸變，
+        reduce 之下沒有過程可言（--dur-* 全部塌成 1ms），白就只剩「多跳一次」。
+        一開始就深色反而**少一次**跳動。
+     ⚠️ 兩邊都要有：css/splash.css 管「CSS 到位之後」，關鍵路徑塊管「CSS 還沒到」的那一段。
+        只改一邊的話 reduce 使用者會看到「白一下下 → 深」——「同一條規則活在兩份實作裡、
+        只改了一邊」正是這個專案反覆踩到的那個病。 */
+  {
+    const R_SC = NOWS(SC).match(/@media\(prefers-reduced-motion:reduce\)\{[\s\S]*$/);
+    ok(!!R_SC && /html\[data-splash-intro="light"\]:not\(\[data-splash="off"\]\)\{background:var\(--splash-bg\);animation:none;\}/.test(R_SC[0]),
+      "★ css/splash.css 的 reduce 區塊把白起關掉（html 底色回 --splash-bg ＋ animation:none）");
+    ok(!!R_SC && /html\[data-splash-intro="light"\]#splash::before\{animation:none;opacity:1;\}/.test(R_SC[0]),
+      "★ 連 ::before 的漸深也停掉（直接就是深色那一層，不留 2ms 的白）");
+    const R_CRIT = CRIT.match(/@media\(prefers-reduced-motion:reduce\)\{[\s\S]*?\}\}/);
+    ok(!!R_CRIT, "★ 關鍵路徑塊裡**也**有 reduce 的覆寫（管的是 splash.css 還沒到的那一段）");
+    ok(!!R_CRIT && /html\[data-splash-intro="light"\]:not\(\[data-splash="off"\]\)/.test(R_CRIT[0]) &&
+       /html\[data-splash-intro="light"\]#splash/.test(R_CRIT[0]) &&
+       /background:var\(--splash-bg,#0b0d12\)/.test(R_CRIT[0]),
+      "★ 而且 html 與 #splash 兩條都覆寫成 --splash-bg 的深色");
+  }
+
+  /* ⑥ 負控組：證明上面那幾把尺會回 false */
+  ok(!/html\[data-splash-intro="light"\]:not\(\[data-splash="off"\]\)[^{}]*\{[^}]*background:var\(--sp-start,/
+      .test('html:not([data-splash="off"]){background:var(--splash-bg,#0b0d12);}'),
+    "負控：只有預設那條 html 底色時，白起的判準必須判成不合格");
+  ok(!/html\[data-splash-intro="light"\]#splash[^{}]*\{[^}]*background:var\(--sp-start,/
+      .test('#splash{background:var(--sp-start,#ebebeb);}'),
+    "負控：沒有 data-splash-intro 前綴的 #splash 規則不算白起覆寫（那會把所有情境都變白）");
+  ok(contrast("#0b0d12", "#0b0d12") < 1.01, "負控：同一個顏色的對比必須是 1（證明 ③ 那把尺不是恆大於 8）");
 }
 
 /* ================================================================

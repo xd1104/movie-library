@@ -205,3 +205,123 @@ html:not([data-splash="off"]){background:var(--splash-bg);}
 @media (prefers-reduced-motion: reduce){
   :root{ --sp-hold:1ms; }
 }
+
+
+/* ============================================================
+   7. 開場變體「白起（light）」—— ⭐ opt-in，**不是**預設
+   ------------------------------------------------------------
+   啟用方式（只有這一個開關，落地的 app 自己決定要不要打開）：
+
+       <html lang="…" data-splash-intro="light">
+
+   ⚠️ 這個屬性**必須靜態寫在 HTML 上**，不可以用 JS 加：
+      JS 加的時候第一幀已經畫過了，等於整個變體沒生效（而且不會報錯）。
+
+   什麼時候該用它？
+   ------------------------------------------------------------
+   **深色 app 在 iOS PWA 上被那 0.23 秒的白咬到的時候。**
+   iPhone 從主畫面開 PWA 的順序是：
+     0 – 0.50s   iOS 自己的啟動畫面（manifest.background_color ＋ icon）
+     0.50 – 0.73s **iOS 把那張圖平滑淡出、淡進 WKWebView**（實測中央像素 #ebebeb）
+     0.73s        我們的第一次繪製
+   §3 講的「第一幀跟系統那張長得一樣就看不出交接點」在**贏得那場賽跑**的時候成立；
+   輸掉的時候（第一次繪製晚於 0.50s），使用者看到的是
+     黑 → 平滑淡到近白 → **硬切成深色** ⇒ 那個硬切就是他說的「閃一下」。
+   白起變體的做法是**接住那片白，把它變成開場的第一拍**：
+   第一幀就是 #ebebeb，然後在 700ms 內平順沉成 --splash-bg，符號在過程中浮出來。
+   ⇒ 白不再是意外，是敘事的一部分；沒有硬切點可以「閃」。
+
+   跟另一種解法（C1）的差別 —— 兩者是**互斥的取捨**，不要一起做
+   ------------------------------------------------------------
+   | | C1：manifest 也改成淺色 | **本變體（C2）** |
+   |---|---|---|
+   | 改哪裡 | `manifest.background_color` ＋ icon ＋ 這裡 | **只有這裡（一個屬性）** |
+   | iOS 系統那張啟動圖 | 也是淺色 ⇒ 全程沒有黑、沒有任何接縫 | 仍然是深色 ⇒ 會看到黑 → 白 → 沉成深色 |
+   | 代價 | ⚠️ **使用者必須把 app 從主畫面移除、重新加一次**（系統啟動圖是安裝當下抄走的），
+            而且 localStorage 看起來會像被清掉；深色 app 每次冷啟動先亮一秒白 | 多一次「黑→白」的來回 |
+   | 什麼時候選 | 你能要求使用者重裝、而且不排斥開場整段是淺的 | **不能要求重裝**（Benson 2026-08-27 選的就是這個） |
+
+   實作上的三個決定（都有理由，不要順手改掉）
+   ------------------------------------------------------------
+   ① 第一幀是 `#ebebeb` 不是 `#ffffff`：`#ebebeb` 是逐格量到的 iOS 交接色，
+      寫純白會在交接點上留一階看得見的亮度跳動 —— 那正是這個變體要消滅的東西。
+   ② 漸深走 `#splash::before` 的 **opacity**，不是 `#splash` 的 `background-color`：
+      - 視覺結果完全一樣（sRGB 線性內插就是 cross-fade）；
+      - 但 `background-color` 每一幀都要重繪整個畫面，opacity 是 compositor-only（§5 的鐵律）；
+      - 更重要的是 **`#splash.out` 已經佔用了 `#splash` 的 `animation`**（收場的淡出）。
+        把漸深也塞進同一條 `animation` 簡寫，收場時整條動畫清單會被換掉、漸深有機會被重播。
+        `::before` 是另一個元素，兩條時間線互不相干。
+   ③ 名字**等底色沉完才出現**（delay = --sp-sink）：淺色的字壓在亮底上讀不到，
+      提早出現只會看到一團灰糊。符號不用等，它是 accent 色塊、在亮底上本來就看得見。
+   ============================================================ */
+:root{
+  /* iOS 淡出後留在畫面上的那片白。⚠️ 這是螢幕錄影逐格（59.94fps）量到的中央像素值，
+     不是猜的，也不是 #ffffff。要改請先重新量一次。 */
+  --sp-start:#ebebeb;
+  /* 白 → --splash-bg 的漸變長度。刻意由既有 token 相加而來（420 + 280 = 700ms），
+     不引進新的時長 —— 沉穩基調是已定案的，這裡只是換一種構圖。 */
+  --sp-sink:calc(var(--dur-3) + var(--dur-2));
+}
+
+/* 7a. 底色：<html> 也要一起沉。
+   #splash 蓋滿畫面，所以平常看不到 html 的底色 —— 但有三個時機看得到：
+   ①#splash 還沒被解析出來的那一瞬間（第一次繪製有可能只有 html）；
+   ②手指把畫面拉過頭（overscroll）；③收場淡出時 #app 以外的區域（寬螢幕）。
+   三個時機的顏色都必須跟開場一致，所以這裡跑同一條時間線。 */
+html[data-splash-intro="light"]:not([data-splash="off"]){
+  background:var(--sp-start);
+  animation:sp-sink-bg var(--sp-sink) linear forwards;
+}
+@keyframes sp-sink-bg{
+  from{background-color:var(--sp-start);}
+  to  {background-color:var(--splash-bg);}
+}
+
+/* 7b. 開場那一層：第一幀是白的，深色底透過 ::before 淡進來 */
+html[data-splash-intro="light"] #splash{ background:var(--sp-start); }
+html[data-splash-intro="light"] #splash::before{
+  content:""; position:absolute; inset:0;
+  background:var(--splash-bg);
+  opacity:0;
+  animation:sp-sink var(--sp-sink) linear forwards;
+}
+@keyframes sp-sink{ from{opacity:0;} to{opacity:1;} }
+
+/* 7c. 符號：在漸深的過程中浮出來（只動 opacity/transform）。
+   蓋掉 §5 的「呼吸」—— 呼吸是為了在一大幕深色上製造第二拍，
+   白起這一版的第二拍是底色本身在沉，再加呼吸會變成兩件事同時搶注意力。 */
+html[data-splash-intro="light"] #splash .sp-glyph{
+  animation:sp-emerge calc(var(--dur-3) + var(--dur-1)) var(--ease) backwards;
+}
+@keyframes sp-emerge{
+  from{opacity:0; transform:scale(var(--scale-in));}
+  to  {opacity:1; transform:none;}
+}
+
+/* 7d. 光環：白起這一版不用。
+   ⚠️ 用 animation:none 明確關掉，不要靠「沒寫規則」—— §5 的 .sp-ring 是**無條件**帶動畫的，
+      沒有這一條它會在亮底上散出一圈幾乎看不見的金環，變成一個沒人要的第三拍。 */
+html[data-splash-intro="light"] .sp-ring{ animation:none; }
+
+/* 7e. 名字：等底色沉到深色才出現（見上面的決定 ③） */
+html[data-splash-intro="light"] #splash .sp-name{
+  animation:sp-up var(--dur-3) var(--ease) backwards var(--sp-sink);
+}
+
+/* 7f. 減少動態：白起**整個關掉**，退回深色的第一幀。
+   ------------------------------------------------------------
+   ⭐ 這不是「順便處理一下 reduce」，是這個變體的定義決定的：
+      白起的價值**全部**在那段漸變 —— 它把「iOS 留下的白 → 我們的深色」這個跳動
+      鋪成一段設計過的過程。reduce 之下沒有過程可言（--dur-* 全部塌成 1ms），
+      白就只剩下「多跳一次」：白 → 深，而且是硬切。
+      ⇒ 對 reduce 使用者來說，**一開始就是深色反而少一次跳動**。
+   ⚠️ app 的關鍵路徑 CSS 也要有同一組覆寫（那一塊才管得到「splash.css 還沒到」的那一段），
+      否則 reduce 使用者會看到「白一下下 → 深」。motion/README.md §白起 有範例。 */
+@media (prefers-reduced-motion: reduce){
+  html[data-splash-intro="light"]:not([data-splash="off"]){
+    background:var(--splash-bg);
+    animation:none;
+  }
+  html[data-splash-intro="light"] #splash{ background:var(--splash-bg); }
+  html[data-splash-intro="light"] #splash::before{ animation:none; opacity:1; }
+}
