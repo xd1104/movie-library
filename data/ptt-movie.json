@@ -1,13 +1,13 @@
 {
-  "updated": "2026-08-26T22:24:57Z",
+  "updated": "2026-08-28T03:39:44Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 784,
-    "tagged": 151,
-    "matched": 88,
+    "posts": 776,
+    "tagged": 142,
+    "matched": 77,
     "ambiguous": 0,
-    "unmatched": 63
+    "unmatched": 65
   },
   "movies": {
     "454639": {
@@ -25,9 +25,9 @@
       ]
     },
     "969681": {
-      "good": 36,
-      "ok": 13,
-      "bad": 6,
+      "good": 27,
+      "ok": 10,
+      "bad": 5,
       "posts": [
         {
           "tag": "好雷",
@@ -51,24 +51,10 @@
           "push": 44
         },
         {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人:重生日 確實好看 但...",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785345086.A.B7E.html",
-          "date": "7/30",
-          "push": 38
-        },
-        {
           "tag": "普雷",
           "title": "[普雷] 說不上好看的蜘蛛人",
           "url": "https://www.ptt.cc/bbs/movie/M.1785597683.A.C60.html",
           "date": "8/01",
-          "push": 31
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人-重生日-其實還是有缺點",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785375787.A.FC7.html",
-          "date": "7/30",
           "push": 31
         },
         {
@@ -80,10 +66,24 @@
         },
         {
           "tag": "好雷",
-          "title": "[好雷] 蜘蛛人：重生日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785391984.A.E33.html",
+          "title": "[好雷] 蜘蛛人:重生日 奈德才是女主吧",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786094887.A.CFE.html",
+          "date": "8/07",
+          "push": 18
+        },
+        {
+          "tag": "普雷",
+          "title": "[ 普雷] 蜘蛛人：重生日",
+          "url": "https://www.ptt.cc/bbs/movie/M.1785417803.A.0D9.html",
           "date": "7/30",
-          "push": 20
+          "push": 18
+        },
+        {
+          "tag": "好雷",
+          "title": "[ 好雷] 蜘蛛人三刷心得",
+          "url": "https://www.ptt.cc/bbs/movie/M.1785874684.A.CCD.html",
+          "date": "8/05",
+          "push": 17
         }
       ]
     },
@@ -111,7 +111,7 @@
           "title": "[好雷] 《橡樹街末日》嘻嘻、不嘻嘻",
           "url": "https://www.ptt.cc/bbs/movie/M.1787674074.A.985.html",
           "date": "8/26",
-          "push": 13
+          "push": 18
         },
         {
           "tag": "普雷",
@@ -284,16 +284,30 @@
       ]
     },
     "1384216": {
-      "good": 1,
-      "ok": 0,
+      "good": 2,
+      "ok": 1,
       "bad": 0,
       "posts": [
+        {
+          "tag": "普雷",
+          "title": "[普雷] 寂地 狗星",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787839581.A.936.html",
+          "date": "8/27",
+          "push": 12
+        },
         {
           "tag": "好雷",
           "title": "[好雷] 《寂地》充滿詩意的末日公路電影",
           "url": "https://www.ptt.cc/bbs/movie/M.1787365143.A.B5B.html",
           "date": "8/22",
-          "push": 5
+          "push": 6
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 《寂地》老派復古的浪漫",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787847695.A.D6A.html",
+          "date": "8/28",
+          "push": 2
         }
       ]
     },
