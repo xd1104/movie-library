@@ -1,13 +1,13 @@
 {
-  "updated": "2026-08-29T02:24:02Z",
+  "updated": "2026-08-29T21:54:10Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 777,
-    "tagged": 141,
-    "matched": 76,
+    "posts": 781,
+    "tagged": 143,
+    "matched": 77,
     "ambiguous": 0,
-    "unmatched": 65
+    "unmatched": 66
   },
   "movies": {
     "454639": {
@@ -25,7 +25,7 @@
       ]
     },
     "969681": {
-      "good": 27,
+      "good": 26,
       "ok": 8,
       "bad": 5,
       "posts": [
@@ -62,7 +62,7 @@
           "title": "[ 普雷] 蜘蛛人 重生日",
           "url": "https://www.ptt.cc/bbs/movie/M.1786726762.A.824.html",
           "date": "8/15",
-          "push": 22
+          "push": 21
         },
         {
           "tag": "好雷",
@@ -221,7 +221,7 @@
       ]
     },
     "1339713": {
-      "good": 8,
+      "good": 9,
       "ok": 2,
       "bad": 0,
       "posts": [
@@ -269,17 +269,17 @@
         },
         {
           "tag": "好雷",
-          "title": "[好雷] 愛你致死不渝 Obsession",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786965678.A.6D3.html",
-          "date": "8/17",
+          "title": "[好雷] 愛你致死不渝",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787990042.A.392.html",
+          "date": "8/29",
           "push": 11
         },
         {
           "tag": "好雷",
-          "title": "[好雷] 愛你致死不渝--換成是你會..?",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786117192.A.F9F.html",
-          "date": "8/07",
-          "push": 9
+          "title": "[好雷] 愛你致死不渝 Obsession",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786965678.A.6D3.html",
+          "date": "8/17",
+          "push": 11
         }
       ]
     },
@@ -307,12 +307,12 @@
           "title": "[好雷] 《寂地》老派復古的浪漫",
           "url": "https://www.ptt.cc/bbs/movie/M.1787847695.A.D6A.html",
           "date": "8/28",
-          "push": 3
+          "push": 4
         }
       ]
     },
     "1433568": {
-      "good": 1,
+      "good": 2,
       "ok": 0,
       "bad": 0,
       "posts": [
@@ -321,7 +321,14 @@
           "title": "[好雷]《粽邪4：坤蒂拉娜》，關於佳敏的成長史。",
           "url": "https://www.ptt.cc/bbs/movie/M.1787846881.A.D8F.html",
           "date": "8/28",
-          "push": 10
+          "push": 13
+        },
+        {
+          "tag": "好雷",
+          "title": "[ 好雷] 粽邪4",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788009773.A.35D.html",
+          "date": "8/29",
+          "push": 5
         }
       ]
     },
