@@ -1,11 +1,11 @@
 {
-  "updated": "2026-08-28T03:39:44Z",
+  "updated": "2026-08-29T02:24:02Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 776,
-    "tagged": 142,
-    "matched": 77,
+    "posts": 777,
+    "tagged": 141,
+    "matched": 76,
     "ambiguous": 0,
     "unmatched": 65
   },
@@ -26,7 +26,7 @@
     },
     "969681": {
       "good": 27,
-      "ok": 10,
+      "ok": 8,
       "bad": 5,
       "posts": [
         {
@@ -72,18 +72,18 @@
           "push": 18
         },
         {
-          "tag": "普雷",
-          "title": "[ 普雷] 蜘蛛人：重生日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785417803.A.0D9.html",
-          "date": "7/30",
-          "push": 18
-        },
-        {
           "tag": "好雷",
           "title": "[ 好雷] 蜘蛛人三刷心得",
           "url": "https://www.ptt.cc/bbs/movie/M.1785874684.A.CCD.html",
           "date": "8/05",
           "push": 17
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 蜘蛛人:重生日 兩個喜歡跟小在意的點",
+          "url": "https://www.ptt.cc/bbs/movie/M.1785547089.A.5E7.html",
+          "date": "8/01",
+          "push": 16
         }
       ]
     },
@@ -307,7 +307,21 @@
           "title": "[好雷] 《寂地》老派復古的浪漫",
           "url": "https://www.ptt.cc/bbs/movie/M.1787847695.A.D6A.html",
           "date": "8/28",
-          "push": 2
+          "push": 3
+        }
+      ]
+    },
+    "1433568": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷]《粽邪4：坤蒂拉娜》，關於佳敏的成長史。",
+          "url": "https://www.ptt.cc/bbs/movie/M.1787846881.A.D8F.html",
+          "date": "8/28",
+          "push": 10
         }
       ]
     },
