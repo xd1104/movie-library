@@ -1,33 +1,19 @@
 {
-  "updated": "2026-08-29T21:54:10Z",
+  "updated": "2026-08-30T21:59:17Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
     "posts": 781,
-    "tagged": 143,
-    "matched": 77,
+    "tagged": 139,
+    "matched": 75,
     "ambiguous": 0,
-    "unmatched": 66
+    "unmatched": 64
   },
   "movies": {
-    "454639": {
-      "good": 0,
-      "ok": 1,
-      "bad": 0,
-      "posts": [
-        {
-          "tag": "普雷",
-          "title": "[普雷] 懷舊娛樂，整體都致敬原作的《太空超人》",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785493892.A.F99.html",
-          "date": "7/31",
-          "push": 2
-        }
-      ]
-    },
     "969681": {
-      "good": 26,
-      "ok": 8,
-      "bad": 5,
+      "good": 25,
+      "ok": 7,
+      "bad": 3,
       "posts": [
         {
           "tag": "好雷",
@@ -41,7 +27,7 @@
           "title": "[好雷] 蜘蛛人：重生日",
           "url": "https://www.ptt.cc/bbs/movie/M.1787050345.A.459.html",
           "date": "8/18",
-          "push": 44
+          "push": 45
         },
         {
           "tag": "普雷",
@@ -193,8 +179,8 @@
       ]
     },
     "1291595": {
-      "good": 0,
-      "ok": 1,
+      "good": 1,
+      "ok": 2,
       "bad": 0,
       "posts": [
         {
@@ -203,6 +189,20 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787475369.A.A84.html",
           "date": "8/23",
           "push": 5
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 陰兒房 穿越陰森處",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788090156.A.A3E.html",
+          "date": "8/30",
+          "push": 1
+        },
+        {
+          "tag": "普雷",
+          "title": "[普雷] 陰兒房：穿越陰深處",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788075456.A.B01.html",
+          "date": "8/30",
+          "push": 0
         }
       ]
     },
@@ -263,16 +263,16 @@
         {
           "tag": "好雷",
           "title": "[好雷] 愛你致死不渝",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786690149.A.2F3.html",
-          "date": "8/14",
-          "push": 12
+          "url": "https://www.ptt.cc/bbs/movie/M.1787990042.A.392.html",
+          "date": "8/29",
+          "push": 13
         },
         {
           "tag": "好雷",
           "title": "[好雷] 愛你致死不渝",
-          "url": "https://www.ptt.cc/bbs/movie/M.1787990042.A.392.html",
-          "date": "8/29",
-          "push": 11
+          "url": "https://www.ptt.cc/bbs/movie/M.1786690149.A.2F3.html",
+          "date": "8/14",
+          "push": 12
         },
         {
           "tag": "好雷",
@@ -284,7 +284,7 @@
       ]
     },
     "1384216": {
-      "good": 2,
+      "good": 3,
       "ok": 1,
       "bad": 0,
       "posts": [
@@ -293,20 +293,27 @@
           "title": "[普雷] 寂地 狗星",
           "url": "https://www.ptt.cc/bbs/movie/M.1787839581.A.936.html",
           "date": "8/27",
-          "push": 12
+          "push": 14
         },
         {
           "tag": "好雷",
           "title": "[好雷] 《寂地》充滿詩意的末日公路電影",
           "url": "https://www.ptt.cc/bbs/movie/M.1787365143.A.B5B.html",
           "date": "8/22",
-          "push": 6
+          "push": 7
         },
         {
           "tag": "好雷",
           "title": "[好雷] 《寂地》老派復古的浪漫",
           "url": "https://www.ptt.cc/bbs/movie/M.1787847695.A.D6A.html",
           "date": "8/28",
+          "push": 5
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 寂地 關於悲傷的末日後公路片",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788064217.A.668.html",
+          "date": "8/30",
           "push": 4
         }
       ]
