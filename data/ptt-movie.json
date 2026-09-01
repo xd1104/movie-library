@@ -1,19 +1,33 @@
 {
-  "updated": "2026-08-31T23:17:58Z",
+  "updated": "2026-09-01T21:56:25Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 788,
-    "tagged": 139,
+    "posts": 784,
+    "tagged": 140,
     "matched": 75,
     "ambiguous": 0,
-    "unmatched": 64
+    "unmatched": 65
   },
   "movies": {
+    "950028": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 開放性邀請 The invite",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788264144.A.9B7.html",
+          "date": "9/01",
+          "push": 5
+        }
+      ]
+    },
     "969681": {
       "good": 23,
       "ok": 9,
-      "bad": 3,
+      "bad": 2,
       "posts": [
         {
           "tag": "好雷",
@@ -45,6 +59,13 @@
         },
         {
           "tag": "普雷",
+          "title": "[普雷] 令我失望的蜘蛛人4",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788184782.A.AB3.html",
+          "date": "8/31",
+          "push": 23
+        },
+        {
+          "tag": "普雷",
           "title": "[ 普雷] 蜘蛛人 重生日",
           "url": "https://www.ptt.cc/bbs/movie/M.1786726762.A.824.html",
           "date": "8/15",
@@ -56,13 +77,6 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1786094887.A.CFE.html",
           "date": "8/07",
           "push": 18
-        },
-        {
-          "tag": "普雷",
-          "title": "[普雷] 令我失望的蜘蛛人4",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788184782.A.AB3.html",
-          "date": "8/31",
-          "push": 17
         },
         {
           "tag": "好雷",
