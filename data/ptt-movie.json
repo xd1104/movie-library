@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-01T21:56:25Z",
+  "updated": "2026-09-02T21:56:47Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 784,
-    "tagged": 140,
-    "matched": 75,
+    "posts": 782,
+    "tagged": 137,
+    "matched": 73,
     "ambiguous": 0,
-    "unmatched": 65
+    "unmatched": 64
   },
   "movies": {
     "950028": {
@@ -20,13 +20,13 @@
           "title": "[好雷] 開放性邀請 The invite",
           "url": "https://www.ptt.cc/bbs/movie/M.1788264144.A.9B7.html",
           "date": "9/01",
-          "push": 5
+          "push": 15
         }
       ]
     },
     "969681": {
       "good": 23,
-      "ok": 9,
+      "ok": 7,
       "bad": 2,
       "posts": [
         {
@@ -52,17 +52,10 @@
         },
         {
           "tag": "普雷",
-          "title": "[普雷] 說不上好看的蜘蛛人",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785597683.A.C60.html",
-          "date": "8/01",
-          "push": 31
-        },
-        {
-          "tag": "普雷",
           "title": "[普雷] 令我失望的蜘蛛人4",
           "url": "https://www.ptt.cc/bbs/movie/M.1788184782.A.AB3.html",
           "date": "8/31",
-          "push": 23
+          "push": 27
         },
         {
           "tag": "普雷",
@@ -84,6 +77,13 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1785874684.A.CCD.html",
           "date": "8/05",
           "push": 17
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷]蜘蛛人好看但其實只是Xman的前導片？",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786330054.A.6EB.html",
+          "date": "8/10",
+          "push": 14
         }
       ]
     },
