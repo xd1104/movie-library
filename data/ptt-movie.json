@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-02T21:56:47Z",
+  "updated": "2026-09-03T21:50:34Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 782,
+    "posts": 780,
     "tagged": 137,
-    "matched": 73,
+    "matched": 68,
     "ambiguous": 0,
-    "unmatched": 64
+    "unmatched": 69
   },
   "movies": {
     "950028": {
@@ -20,21 +20,21 @@
           "title": "[好雷] 開放性邀請 The invite",
           "url": "https://www.ptt.cc/bbs/movie/M.1788264144.A.9B7.html",
           "date": "9/01",
-          "push": 15
+          "push": 17
         }
       ]
     },
     "969681": {
-      "good": 23,
-      "ok": 7,
-      "bad": 2,
+      "good": 20,
+      "ok": 5,
+      "bad": 1,
       "posts": [
         {
           "tag": "好雷",
           "title": "[好雷] 大推蜘蛛人 (無預備知識也好看)",
           "url": "https://www.ptt.cc/bbs/movie/M.1786339886.A.C6F.html",
           "date": "8/10",
-          "push": 48
+          "push": 49
         },
         {
           "tag": "好雷",
@@ -45,17 +45,10 @@
         },
         {
           "tag": "普雷",
-          "title": "[普雷] 不是很好看的蜘蛛人重生日...",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785660813.A.DAA.html",
-          "date": "8/02",
-          "push": 44
-        },
-        {
-          "tag": "普雷",
           "title": "[普雷] 令我失望的蜘蛛人4",
           "url": "https://www.ptt.cc/bbs/movie/M.1788184782.A.AB3.html",
           "date": "8/31",
-          "push": 27
+          "push": 26
         },
         {
           "tag": "普雷",
@@ -84,6 +77,27 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1786330054.A.6EB.html",
           "date": "8/10",
           "push": 14
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 蜘蛛人：重生日 不喜歡這種劇情安排",
+          "url": "https://www.ptt.cc/bbs/movie/M.1785719711.A.F3A.html",
+          "date": "8/03",
+          "push": 14
+        }
+      ]
+    },
+    "1058424": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 希望：末日血戰",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788424804.A.271.html",
+          "date": "9/03",
+          "push": 5
         }
       ]
     },
@@ -342,7 +356,7 @@
           "title": "[好雷]《粽邪4：坤蒂拉娜》，關於佳敏的成長史。",
           "url": "https://www.ptt.cc/bbs/movie/M.1787846881.A.D8F.html",
           "date": "8/28",
-          "push": 14
+          "push": 13
         },
         {
           "tag": "好雷",
