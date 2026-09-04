@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-03T21:50:34Z",
+  "updated": "2026-09-04T21:41:48Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 780,
-    "tagged": 137,
-    "matched": 68,
+    "posts": 789,
+    "tagged": 139,
+    "matched": 66,
     "ambiguous": 0,
-    "unmatched": 69
+    "unmatched": 73
   },
   "movies": {
     "950028": {
@@ -20,12 +20,12 @@
           "title": "[好雷] 開放性邀請 The invite",
           "url": "https://www.ptt.cc/bbs/movie/M.1788264144.A.9B7.html",
           "date": "9/01",
-          "push": 17
+          "push": 18
         }
       ]
     },
     "969681": {
-      "good": 20,
+      "good": 16,
       "ok": 5,
       "bad": 1,
       "posts": [
@@ -88,7 +88,7 @@
       ]
     },
     "1058424": {
-      "good": 1,
+      "good": 2,
       "ok": 0,
       "bad": 0,
       "posts": [
@@ -97,7 +97,14 @@
           "title": "[好雷] 希望：末日血戰",
           "url": "https://www.ptt.cc/bbs/movie/M.1788424804.A.271.html",
           "date": "9/03",
-          "push": 5
+          "push": 6
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 希望:末日血戰 天下第一蛤?",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788526894.A.06A.html",
+          "date": "9/04",
+          "push": 2
         }
       ]
     },
@@ -161,6 +168,20 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787197717.A.292.html",
           "date": "8/20",
           "push": 5
+        }
+      ]
+    },
+    "1101412": {
+      "good": 0,
+      "ok": 0,
+      "bad": 1,
+      "posts": [
+        {
+          "tag": "負雷",
+          "title": "[ 負雷] 墜2 好好使用大腦",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788512679.A.6E6.html",
+          "date": "9/04",
+          "push": 4
         }
       ]
     },
@@ -335,7 +356,7 @@
           "title": "[好雷] 《寂地》老派復古的浪漫",
           "url": "https://www.ptt.cc/bbs/movie/M.1787847695.A.D6A.html",
           "date": "8/28",
-          "push": 5
+          "push": 6
         },
         {
           "tag": "好雷",
@@ -356,7 +377,7 @@
           "title": "[好雷]《粽邪4：坤蒂拉娜》，關於佳敏的成長史。",
           "url": "https://www.ptt.cc/bbs/movie/M.1787846881.A.D8F.html",
           "date": "8/28",
-          "push": 13
+          "push": 14
         },
         {
           "tag": "好雷",
