@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-04T21:41:48Z",
+  "updated": "2026-09-05T21:34:13Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 789,
-    "tagged": 139,
-    "matched": 66,
+    "posts": 788,
+    "tagged": 140,
+    "matched": 64,
     "ambiguous": 0,
-    "unmatched": 73
+    "unmatched": 76
   },
   "movies": {
     "950028": {
@@ -25,8 +25,8 @@
       ]
     },
     "969681": {
-      "good": 16,
-      "ok": 5,
+      "good": 14,
+      "ok": 4,
       "bad": 1,
       "posts": [
         {
@@ -79,11 +79,11 @@
           "push": 14
         },
         {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人：重生日 不喜歡這種劇情安排",
-          "url": "https://www.ptt.cc/bbs/movie/M.1785719711.A.F3A.html",
-          "date": "8/03",
-          "push": 14
+          "tag": "普雷",
+          "title": "[普雷] 蜘蛛人4",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788167011.A.AF5.html",
+          "date": "8/31",
+          "push": 11
         }
       ]
     },
@@ -104,7 +104,7 @@
           "title": "[好雷] 希望:末日血戰 天下第一蛤?",
           "url": "https://www.ptt.cc/bbs/movie/M.1788526894.A.06A.html",
           "date": "9/04",
-          "push": 2
+          "push": 4
         }
       ]
     },
@@ -181,7 +181,7 @@
           "title": "[ 負雷] 墜2 好好使用大腦",
           "url": "https://www.ptt.cc/bbs/movie/M.1788512679.A.6E6.html",
           "date": "9/04",
-          "push": 4
+          "push": 8
         }
       ]
     },
@@ -270,7 +270,7 @@
       ]
     },
     "1339713": {
-      "good": 9,
+      "good": 10,
       "ok": 2,
       "bad": 0,
       "posts": [
