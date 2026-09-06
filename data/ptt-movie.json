@@ -1,15 +1,29 @@
 {
-  "updated": "2026-09-05T21:34:13Z",
+  "updated": "2026-09-06T21:35:21Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 788,
-    "tagged": 140,
-    "matched": 64,
+    "posts": 781,
+    "tagged": 145,
+    "matched": 66,
     "ambiguous": 0,
-    "unmatched": 76
+    "unmatched": 79
   },
   "movies": {
+    "687163": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 極限返航Project Hail Mary",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788710876.A.E85.html",
+          "date": "9/07",
+          "push": 0
+        }
+      ]
+    },
     "950028": {
       "good": 1,
       "ok": 0,
@@ -173,7 +187,7 @@
     },
     "1101412": {
       "good": 0,
-      "ok": 0,
+      "ok": 1,
       "bad": 1,
       "posts": [
         {
@@ -181,21 +195,14 @@
           "title": "[ 負雷] 墜2 好好使用大腦",
           "url": "https://www.ptt.cc/bbs/movie/M.1788512679.A.6E6.html",
           "date": "9/04",
-          "push": 8
-        }
-      ]
-    },
-    "1284041": {
-      "good": 0,
-      "ok": 1,
-      "bad": 0,
-      "posts": [
+          "push": 9
+        },
         {
           "tag": "普雷",
-          "title": "[普雷] 最後孤屋 爸爸好猛",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786982873.A.58F.html",
-          "date": "8/18",
-          "push": 11
+          "title": "[普雷] 墜2",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788721532.A.580.html",
+          "date": "9/07",
+          "push": 0
         }
       ]
     },
@@ -256,10 +263,17 @@
       ]
     },
     "1329016": {
-      "good": 0,
+      "good": 1,
       "ok": 0,
       "bad": 1,
       "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 野生狂廚這部年度好片竟默默下檔",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788680263.A.0DF.html",
+          "date": "9/06",
+          "push": 7
+        },
         {
           "tag": "負雷",
           "title": "[負雷] 野生狂廚-莫名奇妙的角色曲線",
@@ -342,14 +356,14 @@
           "title": "[普雷] 寂地 狗星",
           "url": "https://www.ptt.cc/bbs/movie/M.1787839581.A.936.html",
           "date": "8/27",
-          "push": 14
+          "push": 15
         },
         {
           "tag": "好雷",
           "title": "[好雷] 《寂地》充滿詩意的末日公路電影",
           "url": "https://www.ptt.cc/bbs/movie/M.1787365143.A.B5B.html",
           "date": "8/22",
-          "push": 7
+          "push": 8
         },
         {
           "tag": "好雷",
