@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-06T21:35:21Z",
+  "updated": "2026-09-07T22:13:29Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 781,
-    "tagged": 145,
-    "matched": 66,
+    "posts": 795,
+    "tagged": 147,
+    "matched": 67,
     "ambiguous": 0,
-    "unmatched": 79
+    "unmatched": 80
   },
   "movies": {
     "687163": {
@@ -20,7 +20,7 @@
           "title": "[好雷] 極限返航Project Hail Mary",
           "url": "https://www.ptt.cc/bbs/movie/M.1788710876.A.E85.html",
           "date": "9/07",
-          "push": 0
+          "push": 9
         }
       ]
     },
@@ -123,7 +123,7 @@
       ]
     },
     "1101383": {
-      "good": 3,
+      "good": 4,
       "ok": 6,
       "bad": 3,
       "posts": [
@@ -202,7 +202,7 @@
           "title": "[普雷] 墜2",
           "url": "https://www.ptt.cc/bbs/movie/M.1788721532.A.580.html",
           "date": "9/07",
-          "push": 0
+          "push": 4
         }
       ]
     },
@@ -356,7 +356,7 @@
           "title": "[普雷] 寂地 狗星",
           "url": "https://www.ptt.cc/bbs/movie/M.1787839581.A.936.html",
           "date": "8/27",
-          "push": 15
+          "push": 16
         },
         {
           "tag": "好雷",
