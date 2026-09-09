@@ -1,45 +1,17 @@
 {
-  "updated": "2026-09-08T21:58:44Z",
+  "updated": "2026-09-09T21:52:16Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 792,
-    "tagged": 147,
-    "matched": 68,
+    "posts": 775,
+    "tagged": 142,
+    "matched": 65,
     "ambiguous": 0,
-    "unmatched": 79
+    "unmatched": 77
   },
   "movies": {
-    "687163": {
-      "good": 1,
-      "ok": 0,
-      "bad": 0,
-      "posts": [
-        {
-          "tag": "好雷",
-          "title": "[好雷] 極限返航Project Hail Mary",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788710876.A.E85.html",
-          "date": "9/07",
-          "push": 10
-        }
-      ]
-    },
-    "950028": {
-      "good": 1,
-      "ok": 0,
-      "bad": 0,
-      "posts": [
-        {
-          "tag": "好雷",
-          "title": "[好雷] 開放性邀請 The invite",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788264144.A.9B7.html",
-          "date": "9/01",
-          "push": 18
-        }
-      ]
-    },
-    "969681": {
-      "good": 13,
+    "634649": {
+      "good": 12,
       "ok": 4,
       "bad": 1,
       "posts": [
@@ -98,6 +70,34 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787280587.A.856.html",
           "date": "8/21",
           "push": 8
+        }
+      ]
+    },
+    "687163": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 極限返航Project Hail Mary",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788710876.A.E85.html",
+          "date": "9/07",
+          "push": 10
+        }
+      ]
+    },
+    "950028": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 開放性邀請 The invite",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788264144.A.9B7.html",
+          "date": "9/01",
+          "push": 18
         }
       ]
     },
@@ -209,7 +209,7 @@
           "title": "[普雷] 墜2",
           "url": "https://www.ptt.cc/bbs/movie/M.1788877916.A.87B.html",
           "date": "9/08",
-          "push": 2
+          "push": 3
         }
       ]
     },
@@ -266,27 +266,6 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1788075456.A.B01.html",
           "date": "8/30",
           "push": 0
-        }
-      ]
-    },
-    "1329016": {
-      "good": 1,
-      "ok": 0,
-      "bad": 1,
-      "posts": [
-        {
-          "tag": "好雷",
-          "title": "[好雷] 野生狂廚這部年度好片竟默默下檔",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788680263.A.0DF.html",
-          "date": "9/06",
-          "push": 7
-        },
-        {
-          "tag": "負雷",
-          "title": "[負雷] 野生狂廚-莫名奇妙的角色曲線",
-          "url": "https://www.ptt.cc/bbs/movie/M.1787583656.A.9CF.html",
-          "date": "8/24",
-          "push": 5
         }
       ]
     },
