@@ -1,17 +1,17 @@
 {
-  "updated": "2026-09-09T21:52:16Z",
+  "updated": "2026-09-10T21:47:02Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 775,
-    "tagged": 142,
+    "posts": 784,
+    "tagged": 146,
     "matched": 65,
     "ambiguous": 0,
-    "unmatched": 77
+    "unmatched": 81
   },
   "movies": {
     "634649": {
-      "good": 12,
+      "good": 11,
       "ok": 4,
       "bad": 1,
       "posts": [
@@ -111,7 +111,7 @@
           "title": "[好雷] 希望：末日血戰",
           "url": "https://www.ptt.cc/bbs/movie/M.1788424804.A.271.html",
           "date": "9/03",
-          "push": 6
+          "push": 7
         },
         {
           "tag": "好雷",
@@ -200,16 +200,30 @@
         {
           "tag": "普雷",
           "title": "[普雷] 墜2",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788721532.A.580.html",
-          "date": "9/07",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788877916.A.87B.html",
+          "date": "9/08",
           "push": 4
         },
         {
           "tag": "普雷",
           "title": "[普雷] 墜2",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788877916.A.87B.html",
-          "date": "9/08",
-          "push": 3
+          "url": "https://www.ptt.cc/bbs/movie/M.1788721532.A.580.html",
+          "date": "9/07",
+          "push": 4
+        }
+      ]
+    },
+    "1228710": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 曼達洛人與古古",
+          "url": "https://www.ptt.cc/bbs/movie/M.1789035325.A.747.html",
+          "date": "9/10",
+          "push": 4
         }
       ]
     },
