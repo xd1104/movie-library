@@ -1,17 +1,17 @@
 {
-  "updated": "2026-09-10T21:47:02Z",
+  "updated": "2026-09-11T21:51:56Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 784,
-    "tagged": 146,
-    "matched": 65,
+    "posts": 781,
+    "tagged": 145,
+    "matched": 61,
     "ambiguous": 0,
-    "unmatched": 81
+    "unmatched": 84
   },
   "movies": {
     "634649": {
-      "good": 11,
+      "good": 10,
       "ok": 4,
       "bad": 1,
       "posts": [
@@ -45,13 +45,6 @@
         },
         {
           "tag": "好雷",
-          "title": "[好雷] 蜘蛛人:重生日 奈德才是女主吧",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786094887.A.CFE.html",
-          "date": "8/07",
-          "push": 18
-        },
-        {
-          "tag": "好雷",
           "title": "[好雷]蜘蛛人好看但其實只是Xman的前導片？",
           "url": "https://www.ptt.cc/bbs/movie/M.1786330054.A.6EB.html",
           "date": "8/10",
@@ -69,6 +62,13 @@
           "title": "[ 好雷] 蜘蛛人重生日好看，CP黨看爽了",
           "url": "https://www.ptt.cc/bbs/movie/M.1787280587.A.856.html",
           "date": "8/21",
+          "push": 8
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 蜘蛛人 重生日",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786700984.A.F76.html",
+          "date": "8/14",
           "push": 8
         }
       ]
@@ -223,7 +223,7 @@
           "title": "[好雷] 曼達洛人與古古",
           "url": "https://www.ptt.cc/bbs/movie/M.1789035325.A.747.html",
           "date": "9/10",
-          "push": 4
+          "push": 8
         }
       ]
     },
@@ -284,17 +284,10 @@
       ]
     },
     "1339713": {
-      "good": 11,
+      "good": 9,
       "ok": 2,
       "bad": 0,
       "posts": [
-        {
-          "tag": "好雷",
-          "title": "[好雷] 愛你致死不渝.肖查某的逆襲",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786083706.A.499.html",
-          "date": "8/07",
-          "push": 36
-        },
         {
           "tag": "普雷",
           "title": "[普雷] 愛你致死不渝- 平庸的恐怖片",
@@ -343,6 +336,13 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1786965678.A.6D3.html",
           "date": "8/17",
           "push": 11
+        },
+        {
+          "tag": "普雷",
+          "title": "[普雷] 愛你致死不渝 :(",
+          "url": "https://www.ptt.cc/bbs/movie/M.1786377076.A.DCF.html",
+          "date": "8/10",
+          "push": 7
         }
       ]
     },
@@ -420,20 +420,6 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1787244101.A.2C7.html",
           "date": "8/21",
           "push": 2
-        }
-      ]
-    },
-    "1598766": {
-      "good": 1,
-      "ok": 0,
-      "bad": 0,
-      "posts": [
-        {
-          "tag": "好雷",
-          "title": "[好雷]《電影蠟筆小新：奇奇怪怪！我的妖怪假될",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786081849.A.BC9.html",
-          "date": "8/07",
-          "push": 7
         }
       ]
     }
