@@ -1,15 +1,29 @@
 {
-  "updated": "2026-09-11T21:51:56Z",
+  "updated": "2026-09-12T21:34:26Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 781,
-    "tagged": 145,
-    "matched": 61,
+    "posts": 788,
+    "tagged": 146,
+    "matched": 65,
     "ambiguous": 0,
-    "unmatched": 84
+    "unmatched": 81
   },
   "movies": {
+    "218": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 魔鬼終結者2 35週年紀念版",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788795286.A.C55.html",
+          "date": "9/07",
+          "push": 36
+        }
+      ]
+    },
     "634649": {
       "good": 10,
       "ok": 4,
@@ -223,7 +237,35 @@
           "title": "[好雷] 曼達洛人與古古",
           "url": "https://www.ptt.cc/bbs/movie/M.1789035325.A.747.html",
           "date": "9/10",
-          "push": 8
+          "push": 9
+        }
+      ]
+    },
+    "1244492": {
+      "good": 3,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷]《驀然回首》，藤野與京本從來都是一個人",
+          "url": "https://www.ptt.cc/bbs/movie/M.1789097956.A.0D8.html",
+          "date": "9/11",
+          "push": 16
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷]驀然回首 真人版",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788970036.A.9A3.html",
+          "date": "9/10",
+          "push": 15
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 驀然回首 真人版",
+          "url": "https://www.ptt.cc/bbs/movie/M.1789241842.A.59B.html",
+          "date": "9/13",
+          "push": 0
         }
       ]
     },
