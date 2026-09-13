@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-12T21:34:26Z",
+  "updated": "2026-09-13T21:35:36Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 788,
-    "tagged": 146,
+    "posts": 784,
+    "tagged": 147,
     "matched": 65,
     "ambiguous": 0,
-    "unmatched": 81
+    "unmatched": 82
   },
   "movies": {
     "218": {
@@ -25,7 +25,7 @@
       ]
     },
     "634649": {
-      "good": 10,
+      "good": 9,
       "ok": 4,
       "bad": 1,
       "posts": [
@@ -116,7 +116,7 @@
       ]
     },
     "1058424": {
-      "good": 2,
+      "good": 3,
       "ok": 0,
       "bad": 0,
       "posts": [
@@ -126,6 +126,13 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1788424804.A.271.html",
           "date": "9/03",
           "push": 7
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 希望：末日血戰 Hope",
+          "url": "https://www.ptt.cc/bbs/movie/M.1789312897.A.D3C.html",
+          "date": "9/13",
+          "push": 5
         },
         {
           "tag": "好雷",
@@ -237,7 +244,7 @@
           "title": "[好雷] 曼達洛人與古古",
           "url": "https://www.ptt.cc/bbs/movie/M.1789035325.A.747.html",
           "date": "9/10",
-          "push": 9
+          "push": 11
         }
       ]
     },
@@ -258,14 +265,14 @@
           "title": "[好雷]驀然回首 真人版",
           "url": "https://www.ptt.cc/bbs/movie/M.1788970036.A.9A3.html",
           "date": "9/10",
-          "push": 15
+          "push": 16
         },
         {
           "tag": "好雷",
           "title": "[好雷] 驀然回首 真人版",
           "url": "https://www.ptt.cc/bbs/movie/M.1789241842.A.59B.html",
           "date": "9/13",
-          "push": 0
+          "push": 6
         }
       ]
     },
@@ -353,13 +360,6 @@
         },
         {
           "tag": "好雷",
-          "title": "[好雷] 愛你致死不渝 高明的恐怖手法",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786190156.A.0EC.html",
-          "date": "8/08",
-          "push": 15
-        },
-        {
-          "tag": "好雷",
           "title": "[好雷] 愛你致死不渝",
           "url": "https://www.ptt.cc/bbs/movie/M.1787990042.A.392.html",
           "date": "8/29",
@@ -385,6 +385,13 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1786377076.A.DCF.html",
           "date": "8/10",
           "push": 7
+        },
+        {
+          "tag": "好雷",
+          "title": "[好雷] 愛你致死不渝",
+          "url": "https://www.ptt.cc/bbs/movie/M.1789299781.A.FEB.html",
+          "date": "9/13",
+          "push": 6
         }
       ]
     },
