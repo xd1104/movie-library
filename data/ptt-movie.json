@@ -1,11 +1,11 @@
 {
-  "updated": "2026-09-13T21:35:36Z",
+  "updated": "2026-09-14T22:39:59Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 784,
-    "tagged": 147,
-    "matched": 65,
+    "posts": 798,
+    "tagged": 148,
+    "matched": 66,
     "ambiguous": 0,
     "unmatched": 82
   },
@@ -21,6 +21,20 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1788795286.A.C55.html",
           "date": "9/07",
           "push": 36
+        }
+      ]
+    },
+    "76341": {
+      "good": 1,
+      "ok": 0,
+      "bad": 0,
+      "posts": [
+        {
+          "tag": "好雷",
+          "title": "[好雷] 《瘋狂麥斯 憤怒道》充滿野性的蓬勃生命",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788924035.A.788.html",
+          "date": "9/09",
+          "push": 16
         }
       ]
     },
@@ -122,17 +136,17 @@
       "posts": [
         {
           "tag": "好雷",
+          "title": "[好雷] 希望：末日血戰 Hope",
+          "url": "https://www.ptt.cc/bbs/movie/M.1789312897.A.D3C.html",
+          "date": "9/13",
+          "push": 8
+        },
+        {
+          "tag": "好雷",
           "title": "[好雷] 希望：末日血戰",
           "url": "https://www.ptt.cc/bbs/movie/M.1788424804.A.271.html",
           "date": "9/03",
           "push": 7
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 希望：末日血戰 Hope",
-          "url": "https://www.ptt.cc/bbs/movie/M.1789312897.A.D3C.html",
-          "date": "9/13",
-          "push": 5
         },
         {
           "tag": "好雷",
@@ -255,6 +269,13 @@
       "posts": [
         {
           "tag": "好雷",
+          "title": "[好雷]驀然回首 真人版",
+          "url": "https://www.ptt.cc/bbs/movie/M.1788970036.A.9A3.html",
+          "date": "9/10",
+          "push": 17
+        },
+        {
+          "tag": "好雷",
           "title": "[好雷]《驀然回首》，藤野與京本從來都是一個人",
           "url": "https://www.ptt.cc/bbs/movie/M.1789097956.A.0D8.html",
           "date": "9/11",
@@ -262,17 +283,10 @@
         },
         {
           "tag": "好雷",
-          "title": "[好雷]驀然回首 真人版",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788970036.A.9A3.html",
-          "date": "9/10",
-          "push": 16
-        },
-        {
-          "tag": "好雷",
           "title": "[好雷] 驀然回首 真人版",
           "url": "https://www.ptt.cc/bbs/movie/M.1789241842.A.59B.html",
           "date": "9/13",
-          "push": 6
+          "push": 9
         }
       ]
     },
