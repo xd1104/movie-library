@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-14T22:39:59Z",
+  "updated": "2026-09-15T22:24:42Z",
   "source": "https://www.ptt.cc/bbs/movie/index.html",
   "scanned": {
     "pages": 40,
-    "posts": 798,
-    "tagged": 148,
-    "matched": 66,
+    "posts": 793,
+    "tagged": 146,
+    "matched": 52,
     "ambiguous": 0,
-    "unmatched": 82
+    "unmatched": 94
   },
   "movies": {
     "218": {
@@ -35,69 +35,6 @@
           "url": "https://www.ptt.cc/bbs/movie/M.1788924035.A.788.html",
           "date": "9/09",
           "push": 16
-        }
-      ]
-    },
-    "634649": {
-      "good": 9,
-      "ok": 4,
-      "bad": 1,
-      "posts": [
-        {
-          "tag": "好雷",
-          "title": "[好雷] 大推蜘蛛人 (無預備知識也好看)",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786339886.A.C6F.html",
-          "date": "8/10",
-          "push": 49
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人：重生日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1787050345.A.459.html",
-          "date": "8/18",
-          "push": 46
-        },
-        {
-          "tag": "普雷",
-          "title": "[普雷] 令我失望的蜘蛛人4",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788184782.A.AB3.html",
-          "date": "8/31",
-          "push": 26
-        },
-        {
-          "tag": "普雷",
-          "title": "[ 普雷] 蜘蛛人 重生日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786726762.A.824.html",
-          "date": "8/15",
-          "push": 21
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷]蜘蛛人好看但其實只是Xman的前導片？",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786330054.A.6EB.html",
-          "date": "8/10",
-          "push": 14
-        },
-        {
-          "tag": "普雷",
-          "title": "[普雷] 蜘蛛人4",
-          "url": "https://www.ptt.cc/bbs/movie/M.1788167011.A.AF5.html",
-          "date": "8/31",
-          "push": 11
-        },
-        {
-          "tag": "好雷",
-          "title": "[ 好雷] 蜘蛛人重生日好看，CP黨看爽了",
-          "url": "https://www.ptt.cc/bbs/movie/M.1787280587.A.856.html",
-          "date": "8/21",
-          "push": 8
-        },
-        {
-          "tag": "好雷",
-          "title": "[好雷] 蜘蛛人 重生日",
-          "url": "https://www.ptt.cc/bbs/movie/M.1786700984.A.F76.html",
-          "date": "8/14",
-          "push": 8
         }
       ]
     },
